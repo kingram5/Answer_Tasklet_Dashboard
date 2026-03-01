@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EvictPro — Eviction Notice Generator</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --card: #12121a;
+    --border: #1e1e2e;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  
+  .header { background:var(--card); border-bottom:1px solid var(--border); padding:16px 24px; display:flex; align-items:center; gap:16px; }
+  .logo { font-size:24px; font-weight:800; background:linear-gradient(135deg, var(--accent), #a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .logo-sub { color:var(--muted); font-size:13px; }
+  .badge { background:var(--accent); color:white; font-size:10px; padding:2px 8px; border-radius:20px; font-weight:600; }
+  
+  .container { max-width:800px; margin:0 auto; padding:32px 24px; }
+  
+  .progress { display:flex; gap:8px; margin-bottom:32px; }
+  .progress-step { flex:1; height:4px; border-radius:4px; background:var(--border); transition:all 0.3s; }
+  .progress-step.active { background:var(--accent); }
+  .progress-step.done { background:var(--success); }
+  
+  .step-title { font-size:22px; font-weight:700; margin-bottom:4px; }
+  .step-desc { color:var(--muted); font-size:14px; margin-bottom:24px; }
+  
+  .form-group { margin-bottom:16px; }
+  .form-group label { display:block; font-size:13px; font-weight:600; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width:100%; padding:10px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-size:14px; transition:border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--accent); }
+  .form-group textarea { resize:vertical; min-height:80px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  
+  .btn { padding:10px 24px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; border:none; transition:all 0.2s; }
+  .btn-primary { background:var(--accent); color:white; }
+  .btn-primary:hover { background:var(--accent-hover); transform:translateY(-1px); }
+  .btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .btn-outline:hover { border-color:var(--accent); }
+  .btn-success { background:var(--success); color:white; }
+  .btn-success:hover { opacity:0.9; }
+  .btn-danger { background:var(--danger); color:white; }
+  .btn-danger:hover { opacity:0.9; }
+  .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  
+  .btn-row { display:flex; justify-content:space-between; margin-top:24px; }
+  
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; }
+  
+  .notice-preview { background:white; color:#111; padding:40px; border-radius:8px; font-family:Georgia, 'Times New Roman', serif; line-height:1.7; max-height:500px; overflow-y:auto; }
+  .notice-preview h2 { text-align:center; margin-bottom:24px; font-size:18px; text-transform:uppercase; letter-spacing:1px; }
+  .notice-preview .notice-date { text-align:right; margin-bottom:16px; }
+  .notice-preview .section { margin-bottom:16px; }
+  .notice-preview .signature { margin-top:32px; }
+  
+  .generating { text-align:center; padding:60px; }
+  .generating .spinner { width:48px; height:48px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  
+  .action-bar { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  
+  .history-item { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; transition:border-color 0.2s; }
+  .history-item:hover { border-color:var(--accent); }
+  .history-meta { font-size:12px; color:var(--muted); }
+  
+  .stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:24px; }
+  .stat { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; text-align:center; }
+  .stat-num { font-size:28px; font-weight:800; color:var(--accent); }
+  .stat-label { font-size:12px; color:var(--muted); margin-top:4px; }
+  
+  .tab-bar { display:flex; gap:4px; margin-bottom:24px; }
+  .tab { padding:8px 20px; border-radius:8px; font-size:14px; font-weight:500; cursor:pointer; background:transparent; border:none; color:var(--muted); transition:all 0.2s; }
+  .tab.active { background:var(--accent); color:white; }
+  .tab:hover:not(.active) { color:var(--text); }
+  
+  .editable-notice { background:white; color:#111; padding:40px; border-radius:8px; font-family:Georgia, 'Times New Roman', serif; line-height:1.7; min-height:300px; border:2px solid var(--accent); }
+  
+  .hidden { display:none; }
+  
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--success); color:white; padding:12px 20px; border-radius:8px; font-weight:600; font-size:14px; opacity:0; transform:translateY(20px); transition:all 0.3s; z-index:999; }
+  .toast.show { opacity:1; transform:translateY(0); }
+
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns:1fr; }
+    .stats { grid-template-columns:1fr; }
+    .container { padding:16px; }
+  }
+
+  @media print {
+    body { background:white; }
+    .header, .progress, .step-title, .step-desc, .btn-row, .action-bar, .tab-bar, .stats { display:none !important; }
+    .notice-preview, .editable-notice { border:none; box-shadow:none; max-height:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">⚖️ EvictPro</div>
+    <div class="logo-sub">Eviction Notice Generator</div>
+  </div>
+  <span class="badge">MVP DEMO</span>
+</div>
+
+<div class="container">
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('create')">📝 Create Notice</button>
+    <button class="tab" onclick="showTab('history')">📋 History</button>
+  </div>
+
+  <!-- CREATE TAB -->
+  <div id="tab-create">
+    <!-- Progress bar -->
+    <div class="progress">
+      <div class="progress-step active" id="prog-1"></div>
+      <div class="progress-step" id="prog-2"></div>
+      <div class="progress-step" id="prog-3"></div>
+      <div class="progress-step" id="prog-4"></div>
+    </div>
+
+    <!-- STEP 1: Property -->
+    <div id="step-1" class="card">
+      <div class="step-title">📍 Property Information</div>
+      <div class="step-desc">Enter details about the property subject to eviction</div>
+      
+      <div class="form-group">
+        <label>Property Address</label>
+        <input type="text" id="prop-address" placeholder="123 Main St, Suite 200">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" id="prop-city" placeholder="Dallas">
+        </div>
+        <div class="form-group">
+          <label>State</label>
+          <select id="prop-state">
+            <option value="">Select State...</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ZIP Code</label>
+          <input type="text" id="prop-zip" placeholder="75201">
+        </div>
+        <div class="form-group">
+          <label>Property Type</label>
+          <select id="prop-type">
+            <option value="commercial">Commercial</option>
+            <option value="residential">Residential</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <div></div>
+        <button class="btn btn-primary" onclick="nextStep(2)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Landlord -->
+    <div id="step-2" class="card hidden">
+      <div class="step-title">🏢 Landlord / Property Owner</div>
+      <div class="step-desc">Who is issuing the eviction notice?</div>
+      
+      <div class="form-group">
+        <label>Full Legal Name / Entity Name</label>
+        <input type="text" id="ll-name" placeholder="ABC Properties LLC">
+      </div>
+      <div class="form-group">
+        <label>Mailing Address</label>
+        <input type="text" id="ll-address" placeholder="456 Corporate Blvd, Suite 100, Dallas, TX 75201">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" id="ll-phone" placeholder="(214) 555-0100">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="ll-email" placeholder="legal@abcproperties.com">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Attorney / Representative (Optional)</label>
+        <input type="text" id="ll-attorney" placeholder="John Smith, Esq.">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="nextStep(1)">← Back</button>
+        <button class="btn btn-primary" onclick="nextStep(3)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Tenant -->
+    <div id="step-3" class="card hidden">
+      <div class="step-title">👤 Tenant Information</div>
+      <div class="step-desc">Who is receiving the eviction notice?</div>
+      
+      <div class="form-group">
+        <label>Full Legal Name / Business Name</label>
+        <input type="text" id="tn-name" placeholder="XYZ Corp dba Quick Mart">
+      </div>
+      <div class="form-group">
+        <label>Unit / Suite Number (if different from property)</label>
+        <input type="text" id="tn-unit" placeholder="Suite 200">
+      </div>
+      <div class="form-group">
+        <label>Lease Start Date</label>
+        <input type="date" id="tn-lease-start">
+      </div>
+      <div class="form-group">
+        <label>Monthly Rent Amount</label>
+        <input type="text" id="tn-rent" placeholder="$5,000.00">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="nextStep(2)">← Back</button>
+        <button class="btn btn-primary" onclick="nextStep(4)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Violation -->
+    <div id="step-4" class="card hidden">
+      <div class="step-title">⚠️ Violation Details</div>
+      <div class="step-desc">Specify the grounds for eviction</div>
+      
+      <div class="form-group">
+        <label>Violation Type</label>
+        <select id="vio-type" onchange="toggleVioFields()">
+          <option value="non-payment">Non-Payment of Rent</option>
+          <option value="lease-violation">Lease Violation</option>
+          <option value="holdover">Holdover (Lease Expired)</option>
+          <option value="nuisance">Nuisance / Property Damage</option>
+          <option value="illegal-activity">Illegal Activity</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group" id="vio-amount-group">
+        <label>Total Amount Owed</label>
+        <input type="text" id="vio-amount" placeholder="$15,000.00">
+      </div>
+      <div class="form-group" id="vio-months-group">
+        <label>Months Delinquent</label>
+        <input type="text" id="vio-months" placeholder="3">
+      </div>
+      <div class="form-group">
+        <label>Description of Violation</label>
+        <textarea id="vio-desc" placeholder="Describe the specific violation, including dates and relevant details..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Cure Period (Days)</label>
+        <input type="number" id="vio-cure" placeholder="3" value="3">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="nextStep(3)">← Back</button>
+        <button class="btn btn-primary" onclick="generateNotice()">⚡ Generate Notice</button>
+      </div>
+    </div>
+
+    <!-- GENERATING -->
+    <div id="step-generating" class="card hidden">
+      <div class="generating">
+        <div class="spinner"></div>
+        <div class="step-title">Generating Eviction Notice...</div>
+        <div class="step-desc">Applying state-specific statutes and legal formatting</div>
+      </div>
+    </div>
+
+    <!-- STEP 5: Review -->
+    <div id="step-review" class="card hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <div class="step-title">📄 Attorney Review</div>
+          <div class="step-desc">Review, edit, and approve the generated notice</div>
+        </div>
+        <button class="btn btn-outline" onclick="toggleEdit()" id="edit-btn">✏️ Edit</button>
+      </div>
+      
+      <div id="notice-display" class="notice-preview"></div>
+      <div id="notice-edit" class="hidden">
+        <div contenteditable="true" id="notice-editable" class="editable-notice"></div>
+      </div>
+      
+      <div class="action-bar">
+        <button class="btn btn-success" onclick="approveNotice()">✅ Approve & Save</button>
+        <button class="btn btn-outline" onclick="copyNotice()">📋 Copy Text</button>
+        <button class="btn btn-outline" onclick="printNotice()">🖨️ Print / PDF</button>
+        <button class="btn btn-outline" onclick="downloadNotice()">⬇️ Download</button>
+        <button class="btn btn-danger" onclick="startOver()">🔄 Start Over</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="tab-history" class="hidden">
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-label">Total Generated</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="stat-approved">0</div>
+        <div class="stat-label">Approved</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="stat-states">0</div>
+        <div class="stat-label">States Covered</div>
+      </div>
+    </div>
+    <div id="history-list">
+      <div style="text-align:center; color:var(--muted); padding:40px;">
+        No notices generated yet. Create your first one!
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+const STATES = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"];
+const STATE_ABBR = {"Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA","Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA","Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA","Kansas":"KS","Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD","Massachusetts":"MA","Michigan":"MI","Minnesota":"MN","Mississippi":"MS","Missouri":"MO","Montana":"MT","Nebraska":"NE","Nevada":"NV","New Hampshire":"NH","New Jersey":"NJ","New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND","Ohio":"OH","Oklahoma":"OK","Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC","South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT","Vermont":"VT","Virginia":"VA","Washington":"WA","West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY"};
+
+const STATE_STATUTES = {
+  "Texas": { statute: "Tex. Prop. Code § 24.005", cureDays: 3, name: "Texas Property Code" },
+  "California": { statute: "Cal. Civ. Proc. Code § 1161", cureDays: 3, name: "California Civil Code" },
+  "Florida": { statute: "Fla. Stat. § 83.56", cureDays: 3, name: "Florida Statutes" },
+  "New York": { statute: "N.Y. Real Prop. Acts. Law § 711", cureDays: 14, name: "New York Real Property Actions and Proceedings Law" },
+  "Illinois": { statute: "735 ILCS 5/9-209", cureDays: 5, name: "Illinois Code of Civil Procedure" },
+  "Georgia": { statute: "O.C.G.A. § 44-7-50", cureDays: 0, name: "Georgia Code" },
+  "Ohio": { statute: "Ohio Rev. Code § 1923.04", cureDays: 3, name: "Ohio Revised Code" },
+  "Pennsylvania": { statute: "68 Pa. Stat. § 250.501", cureDays: 10, name: "Pennsylvania Landlord and Tenant Act" },
+  "Michigan": { statute: "MCL § 554.134", cureDays: 7, name: "Michigan Compiled Laws" },
+  "North Carolina": { statute: "N.C. Gen. Stat. § 42-3", cureDays: 10, name: "North Carolina General Statutes" },
+  "default": { statute: "applicable state landlord-tenant statute", cureDays: 3, name: "State Landlord-Tenant Law" }
+};
+
+const VIOLATION_LABELS = {
+  "non-payment": "Non-Payment of Rent",
+  "lease-violation": "Lease/Rental Agreement Violation",
+  "holdover": "Holdover Tenancy (Expired Lease)",
+  "nuisance": "Nuisance / Property Damage",
+  "illegal-activity": "Illegal Activity on Premises",
+  "other": "Breach of Lease Agreement"
+};
+
+let currentStep = 1;
+let notices = JSON.parse(localStorage.getItem('evictpro_notices') || '[]');
+let isEditing = false;
+let currentNoticeHtml = '';
+
+// Populate states
+const stateSelect = document.getElementById('prop-state');
+STATES.forEach(s => {
+  const opt = document.createElement('option');
+  opt.value = s;
+  opt.textContent = s;
+  stateSelect.appendChild(opt);
+});
+
+function nextStep(step) {
+  document.getElementById(`step-${currentStep}`).classList.add('hidden');
+  document.getElementById(`step-${step}`).classList.remove('hidden');
+  for(let i=1;i<=4;i++) {
+    const p = document.getElementById(`prog-${i}`);
+    p.className = 'progress-step' + (i < step ? ' done' : i === step ? ' active' : '');
+  }
+  currentStep = step;
+}
+
+function toggleVioFields() {
+  const type = document.getElementById('vio-type').value;
+  document.getElementById('vio-amount-group').style.display = type === 'non-payment' ? 'block' : 'none';
+  document.getElementById('vio-months-group').style.display = type === 'non-payment' ? 'block' : 'none';
+}
+
+function getFormData() {
+  return {
+    property: {
+      address: document.getElementById('prop-address').value || '123 Main Street',
+      city: document.getElementById('prop-city').value || 'Dallas',
+      state: document.getElementById('prop-state').value || 'Texas',
+      zip: document.getElementById('prop-zip').value || '75201',
+      type: document.getElementById('prop-type').value
+    },
+    landlord: {
+      name: document.getElementById('ll-name').value || 'Property Owner',
+      address: document.getElementById('ll-address').value || '',
+      phone: document.getElementById('ll-phone').value || '',
+      email: document.getElementById('ll-email').value || '',
+      attorney: document.getElementById('ll-attorney').value || ''
+    },
+    tenant: {
+      name: document.getElementById('tn-name').value || 'Tenant',
+      unit: document.getElementById('tn-unit').value || '',
+      leaseStart: document.getElementById('tn-lease-start').value || '',
+      rent: document.getElementById('tn-rent').value || '$0.00'
+    },
+    violation: {
+      type: document.getElementById('vio-type').value,
+      amount: document.getElementById('vio-amount').value || '$0.00',
+      months: document.getElementById('vio-months').value || '0',
+      description: document.getElementById('vio-desc').value || 'Failure to comply with lease terms.',
+      cureDays: document.getElementById('vio-cure').value || '3'
+    }
+  };
+}
+
+function generateNotice() {
+  document.getElementById(`step-${currentStep}`).classList.add('hidden');
+  document.getElementById('step-generating').classList.remove('hidden');
+  
+  setTimeout(() => {
+    const data = getFormData();
+    const html = buildNotice(data);
+    currentNoticeHtml = html;
+    
+    document.getElementById('notice-display').innerHTML = html;
+    document.getElementById('notice-editable').innerHTML = html;
+    document.getElementById('step-generating').classList.add('hidden');
+    document.getElementById('step-review').classList.remove('hidden');
+    
+    for(let i=1;i<=4;i++) document.getElementById(`prog-${i}`).className = 'progress-step done';
+  }, 1500);
+}
+
+function buildNotice(d) {
+  const stateInfo = STATE_STATUTES[d.property.state] || STATE_STATUTES["default"];
+  const abbr = STATE_ABBR[d.property.state] || d.property.state;
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  const cureDate = new Date(today);
+  cureDate.setDate(cureDate.getDate() + parseInt(d.violation.cureDays));
+  const cureDateStr = cureDate.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  const violationLabel = VIOLATION_LABELS[d.violation.type];
+  const isNonPayment = d.violation.type === 'non-payment';
+  const isCommercial = d.property.type === 'commercial';
+  
+  let noticeTitle = '';
+  if(isNonPayment) noticeTitle = `NOTICE TO PAY RENT OR QUIT`;
+  else if(d.violation.type === 'holdover') noticeTitle = `NOTICE TO QUIT`;
+  else noticeTitle = `NOTICE TO CURE OR QUIT`;
+
+  let body = `
+    <h2>${noticeTitle}</h2>
+    <p class="notice-date">${dateStr}</p>
+    
+    <div class="section">
+      <strong>TO:</strong> ${d.tenant.name}<br>
+      ${d.tenant.unit ? d.tenant.unit + ', ' : ''}${d.property.address}<br>
+      ${d.property.city}, ${abbr} ${d.property.zip}
+    </div>
+
+    <div class="section">
+      <strong>FROM:</strong> ${d.landlord.name}<br>
+      ${d.landlord.address ? d.landlord.address + '<br>' : ''}
+      ${d.landlord.attorney ? '<em>By and through counsel: ' + d.landlord.attorney + '</em><br>' : ''}
+    </div>
+
+    <div class="section">
+      <strong>RE:</strong> ${isCommercial ? 'Commercial ' : ''}Lease Agreement for property located at ${d.property.address}, ${d.property.city}, ${abbr} ${d.property.zip}
+      ${d.tenant.leaseStart ? '<br>Lease Commencement Date: ' + new Date(d.tenant.leaseStart).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) : ''}
+    </div>
+
+    <hr style="margin:20px 0; border:none; border-top:1px solid #ccc;">
+
+    <div class="section">
+      <p>PLEASE TAKE NOTICE that pursuant to ${stateInfo.statute} of the ${stateInfo.name}, you are hereby notified that you are in violation of your lease agreement for the above-referenced premises for the following reason:</p>
+    </div>
+
+    <div class="section">
+      <p><strong>VIOLATION:</strong> ${violationLabel}</p>
+      <p>${d.violation.description}</p>
+    </div>`;
+
+  if(isNonPayment) {
+    body += `
+    <div class="section">
+      <p><strong>AMOUNT DUE:</strong></p>
+      <p>Total rent owed: <strong>${d.violation.amount}</strong></p>
+      <p>Months delinquent: <strong>${d.violation.months}</strong></p>
+      <p>Monthly rent per lease agreement: <strong>${d.tenant.rent}</strong></p>
+    </div>`;
+  }
+
+  if(d.violation.type !== 'holdover') {
+    body += `
+    <div class="section">
+      <p><strong>DEMAND TO CURE:</strong></p>
+      <p>You are hereby given <strong>${d.violation.cureDays} day(s)</strong> from the date of service of this notice to ${isNonPayment ? 'pay the full amount owed' : 'cure the above-described violation'}. The cure period expires on <strong>${cureDateStr}</strong>.</p>
+    </div>`;
+  }
+
+  body += `
+    <div class="section">
+      <p><strong>CONSEQUENCE OF NON-COMPLIANCE:</strong></p>
+      <p>If you fail to ${isNonPayment ? 'pay the total amount due' : d.violation.type === 'holdover' ? 'vacate the premises' : 'cure the above violation'} within the specified time period, the ${isCommercial ? 'Landlord' : 'Owner'} will commence legal proceedings against you to recover possession of the premises${isNonPayment ? ', past due rent, and all applicable damages, court costs, and attorney\'s fees' : ' and all applicable damages, court costs, and attorney\'s fees'} as provided by law under ${stateInfo.statute}.</p>
+    </div>
+
+    <div class="section">
+      <p>This notice is intended to be a <strong>${d.violation.cureDays}-Day ${noticeTitle.replace('NOTICE ', '')}</strong> in accordance with the laws of the State of ${d.property.state}. This notice is not intended to waive any rights of the ${isCommercial ? 'Landlord' : 'Owner'} under the lease agreement or applicable law, all of which are expressly reserved.</p>
+    </div>
+
+    <div class="section">
+      <p><strong>METHOD OF SERVICE:</strong> This notice was served via:</p>
+      <p>☐ Personal delivery &nbsp; ☐ Certified mail, return receipt requested &nbsp; ☐ Posting on premises</p>
+    </div>
+
+    <div class="signature">
+      <p>Respectfully,</p>
+      <br><br>
+      <p>_________________________________</p>
+      <p><strong>${d.landlord.name}</strong></p>
+      ${d.landlord.attorney ? '<p><em>' + d.landlord.attorney + '</em></p>' : ''}
+      ${d.landlord.phone ? '<p>' + d.landlord.phone + '</p>' : ''}
+      ${d.landlord.email ? '<p>' + d.landlord.email + '</p>' : ''}
+      <br>
+      <p style="font-size:12px; color:#666;">Date of Service: _________________</p>
+    </div>
+
+    <hr style="margin:20px 0; border:none; border-top:1px solid #ccc;">
+    
+    <div style="font-size:11px; color:#888; text-align:center;">
+      <p><em>CERTIFICATE OF SERVICE</em></p>
+      <p>I hereby certify that a true and correct copy of this notice was served upon the above-named tenant(s) on the _____ day of _____________, ${today.getFullYear()}, by the method indicated above.</p>
+      <br>
+      <p>Signature: _________________________________ &nbsp; Date: _____________</p>
+    </div>`;
+
+  return body;
+}
+
+function toggleEdit() {
+  isEditing = !isEditing;
+  document.getElementById('notice-display').classList.toggle('hidden', isEditing);
+  document.getElementById('notice-edit').classList.toggle('hidden', !isEditing);
+  document.getElementById('edit-btn').textContent = isEditing ? '👁️ Preview' : '✏️ Edit';
+  if(!isEditing) {
+    currentNoticeHtml = document.getElementById('notice-editable').innerHTML;
+    document.getElementById('notice-display').innerHTML = currentNoticeHtml;
+  }
+}
+
+function copyNotice() {
+  const el = document.getElementById('notice-display');
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand('copy');
+  sel.removeAllRanges();
+  showToast('Notice copied to clipboard!');
+}
+
+function printNotice() {
+  window.print();
+}
+
+function downloadNotice() {
+  const content = document.getElementById('notice-display').innerHTML;
+  const html = `<!DOCTYPE html><html><head><title>Eviction Notice</title><style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:20px;line-height:1.7;color:#111}h2{text-align:center;text-transform:uppercase;letter-spacing:1px}.notice-date{text-align:right}.section{margin-bottom:16px}.signature{margin-top:32px}</style></head><body>${content}</body></html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'eviction-notice.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Notice downloaded!');
+}
+
+function approveNotice() {
+  const data = getFormData();
+  const notice = {
+    id: Date.now(),
+    date: new Date().toLocaleDateString(),
+    tenant: data.tenant.name,
+    property: `${data.property.address}, ${data.property.city}, ${STATE_ABBR[data.property.state] || data.property.state}`,
+    type: VIOLATION_LABELS[data.violation.type],
+    state: data.property.state,
+    html: currentNoticeHtml,
+    approved: true
+  };
+  notices.unshift(notice);
+  localStorage.setItem('evictpro_notices', JSON.stringify(notices));
+  updateHistory();
+  showToast('✅ Notice approved and saved!');
+}
+
+function startOver() {
+  document.getElementById('step-review').classList.add('hidden');
+  document.getElementById('step-1').classList.remove('hidden');
+  currentStep = 1;
+  isEditing = false;
+  document.getElementById('notice-display').classList.remove('hidden');
+  document.getElementById('notice-edit').classList.add('hidden');
+  document.getElementById('edit-btn').textContent = '✏️ Edit';
+  for(let i=1;i<=4;i++) {
+    const p = document.getElementById(`prog-${i}`);
+    p.className = 'progress-step' + (i === 1 ? ' active' : '');
+  }
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-create').classList.add('hidden');
+  document.getElementById('tab-history').classList.add('hidden');
+  document.getElementById(`tab-${tab}`).classList.remove('hidden');
+  event.target.classList.add('active');
+  if(tab === 'history') updateHistory();
+}
+
+function updateHistory() {
+  const list = document.getElementById('history-list');
+  const states = new Set(notices.map(n => n.state));
+  document.getElementById('stat-total').textContent = notices.length;
+  document.getElementById('stat-approved').textContent = notices.filter(n => n.approved).length;
+  document.getElementById('stat-states').textContent = states.size;
+  
+  if(notices.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;">No notices generated yet. Create your first one!</div>';
+    return;
+  }
+  
+  list.innerHTML = notices.map((n, i) => `
+    <div class="history-item" onclick="viewNotice(${i})">
+      <div>
+        <strong>${n.tenant}</strong><br>
+        <span style="font-size:13px;color:var(--muted);">${n.property} — ${n.type}</span>
+      </div>
+      <div class="history-meta">${n.date}</div>
+    </div>
+  `).join('');
+}
+
+function viewNotice(idx) {
+  const notice = notices[idx];
+  currentNoticeHtml = notice.html;
+  document.getElementById('notice-display').innerHTML = notice.html;
+  document.getElementById('notice-editable').innerHTML = notice.html;
+  document.getElementById('tab-history').classList.add('hidden');
+  document.getElementById('tab-create').classList.remove('hidden');
+  document.querySelectorAll('.tab')[0].classList.add('active');
+  document.querySelectorAll('.tab')[1].classList.remove('active');
+  
+  ['step-1','step-2','step-3','step-4','step-generating'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('step-review').classList.remove('hidden');
+  for(let i=1;i<=4;i++) document.getElementById(`prog-${i}`).className = 'progress-step done';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Init
+toggleVioFields();
+updateHistory();
+</script>
+</body>
+</html>
