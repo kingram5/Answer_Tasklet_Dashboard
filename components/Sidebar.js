@@ -29,7 +29,7 @@ export default function Sidebar({ isOpen, onClose }) {
         className={`
           fixed top-0 left-0 h-full w-60 bg-dark-800 border-r border-white/10
           z-50 transform transition-transform duration-200 ease-in-out
-          lg:translate-x-0 lg:static lg:z-auto flex flex-col
+          lg:translate-x-0 flex flex-col
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
