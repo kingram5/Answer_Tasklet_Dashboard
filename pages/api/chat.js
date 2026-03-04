@@ -35,13 +35,13 @@ export default async function handler(req, res) {
         session_id: sessionId,
         role: 'user',
         content: lastUserMsg.content,
-        model_used: 'claude-sonnet-4-5-20250514',
+        model_used: 'claude-sonnet-4-5-20250929',
       });
     }
 
     // Call Anthropic Messages API
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
       session_id: sessionId,
       role: 'assistant',
       content,
-      model_used: 'claude-sonnet-4-5-20250514',
+      model_used: 'claude-sonnet-4-5-20250929',
       tokens_in: response.usage?.input_tokens || 0,
       tokens_out: response.usage?.output_tokens || 0,
     });
