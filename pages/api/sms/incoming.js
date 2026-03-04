@@ -5,7 +5,7 @@ import { validateTwilioRequest, sendSMS } from '../../../lib/twilio';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const KYLE_NUMBER = '+17144698951';
 
-const SMS_SYSTEM_PROMPT = `You are Answer — Kyle's AI agent, responding via text message.
+const SMS_BASE_PROMPT = `You are Answer — Kyle's AI agent, responding via text message.
 
 Voice: Same as always. Casual, direct, no filler. Extra brief — this is SMS, not a chat window. Keep responses under 300 characters when possible. Go longer only when the content requires it.
 
@@ -25,11 +25,89 @@ Example:
 "Added it. Trojan Solar follow-up, high priority, due Thursday.
 <action>{"type": "CREATE_TASK", "data": {"title": "Follow up with Trojan Solar on Q2 pricing", "priority": "high", "due_date": "2026-03-06T00:00:00Z", "account_name": "Trojan Solar"}}</action>"
 
-If no action is needed, just reply normally with no <action> tags.
+If no action is needed, just reply normally with no <action> tags.`;
 
-Current date: ${new Date().toISOString().split('T')[0]}
+// Load live dashboard state from Supabase to give Answer full visibility
+async function loadDashboardContext() {
+  const [tasksRes, accountsRes, emailsRes, bridgeRes] = await Promise.all([
+    // Open tasks (not done/cancelled)
+    supabaseAdmin
+      .from('tasks')
+      .select('title, status, priority, due_date, source')
+      .not('status', 'in', '("done","cancelled")')
+      .order('priority', { ascending: true })
+      .limit(30),
+    // All accounts with health and last contact
+    supabaseAdmin
+      .from('accounts')
+      .select('name, health, last_contact, next_action, notes')
+      .order('name'),
+    // Recent emails (last 3 days)
+    supabaseAdmin
+      .from('emails')
+      .select('subject, original_sender, classification, ai_summary, received_at')
+      .gte('received_at', new Date(Date.now() - 3 * 86400000).toISOString())
+      .order('received_at', { ascending: false })
+      .limit(15),
+    // Recent bridge messages (last 7 days)
+    supabaseAdmin
+      .from('bridge_messages')
+      .select('from_agent, to_agent, message, category, created_at')
+      .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(10),
+  ]);
 
-Current accounts: Mayer Solar, NXT Level, Synaptic, Kpost Roofing, Tarrant Roofing, Trojan Solar, Gamma Strategies, Just In Case, AguaSol, SolarTime, THS, Harvest, Sandhu Solar, Solar Scouts, Vantage Point.`;
+  const tasks = tasksRes.data || [];
+  const accounts = accountsRes.data || [];
+  const emails = emailsRes.data || [];
+  const bridge = bridgeRes.data || [];
+
+  let context = `\n\nCurrent date: ${new Date().toISOString().split('T')[0]}`;
+
+  // Tasks
+  if (tasks.length > 0) {
+    context += `\n\n== OPEN TASKS (${tasks.length}) ==`;
+    for (const t of tasks) {
+      const due = t.due_date ? ` | due ${t.due_date.split('T')[0]}` : '';
+      context += `\n- [${t.priority}/${t.status}] ${t.title}${due}`;
+    }
+  } else {
+    context += '\n\n== OPEN TASKS: None ==';
+  }
+
+  // Accounts
+  if (accounts.length > 0) {
+    context += `\n\n== ACCOUNTS (${accounts.length}) ==`;
+    for (const a of accounts) {
+      const lastContact = a.last_contact ? new Date(a.last_contact).toISOString().split('T')[0] : 'never';
+      const health = a.health || 'unknown';
+      const next = a.next_action ? ` | next: ${a.next_action}` : '';
+      context += `\n- ${a.name} [${health}] last contact: ${lastContact}${next}`;
+    }
+  }
+
+  // Recent emails
+  if (emails.length > 0) {
+    context += `\n\n== RECENT EMAILS (${emails.length}) ==`;
+    for (const e of emails) {
+      const sender = e.original_sender || 'unknown';
+      const cls = e.classification || '';
+      const summary = e.ai_summary ? ` — ${e.ai_summary}` : '';
+      context += `\n- [${cls}] "${e.subject}" from ${sender}${summary}`;
+    }
+  }
+
+  // Bridge messages
+  if (bridge.length > 0) {
+    context += `\n\n== RECENT BRIDGE MESSAGES ==`;
+    for (const b of bridge) {
+      context += `\n- ${b.from_agent}→${b.to_agent} [${b.category}]: ${b.message}`;
+    }
+  }
+
+  return context;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -67,15 +145,19 @@ export default async function handler(req, res) {
     // Add current message
     conversationHistory.push({ role: 'user', content: message.trim() });
 
-    // 2. Choose model based on message complexity
+    // 2. Load live dashboard context from Supabase
+    const dashboardContext = await loadDashboardContext();
+    const systemPrompt = SMS_BASE_PROMPT + dashboardContext;
+
+    // 3. Choose model based on message complexity
     const isSimple = message.trim().length < 50 || /^(yes|no|ok|done|thanks|got it|mark|log|add task)/i.test(message.trim());
     const model = isSimple ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5-20250929';
 
-    // 3. Call Anthropic
+    // 4. Call Anthropic
     const aiResponse = await anthropic.messages.create({
       model,
       max_tokens: 1024,
-      system: SMS_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: conversationHistory,
     });
 
@@ -84,10 +166,10 @@ export default async function handler(req, res) {
       .map(b => b.text)
       .join('');
 
-    // 4. Parse response: extract reply text and actions
+    // 5. Parse response: extract reply text and actions
     const { replyText, actions } = parseResponse(fullResponse);
 
-    // 5. Execute actions
+    // 6. Execute actions
     const actionErrors = [];
     for (const action of actions) {
       try {
@@ -98,13 +180,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // 6. Build final reply
+    // 7. Build final reply
     let finalReply = replyText;
     if (actionErrors.length > 0) {
       finalReply += `\n(Couldn't save: ${actionErrors.join(', ')} — I'll retry next message)`;
     }
 
-    // 7. Store conversation in chat_history (explicit timestamps to guarantee ordering)
+    // 8. Store conversation in chat_history (explicit timestamps to guarantee ordering)
     const now = new Date();
     await supabaseAdmin.from('chat_history').insert([
       {
@@ -125,7 +207,7 @@ export default async function handler(req, res) {
       },
     ]);
 
-    // 8. Send SMS reply via Twilio
+    // 9. Send SMS reply via Twilio
     await sendSMS(KYLE_NUMBER, finalReply);
 
     // Return TwiML empty response (we send reply via API, not TwiML)
