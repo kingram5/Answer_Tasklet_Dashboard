@@ -1,6 +1,22 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+function parseOriginalSender(bodyPreview) {
+  if (!bodyPreview) return null;
+  // Look for From: after Outlook separator (________) or "Original Message" / "Forwarded message"
+  const afterSep = bodyPreview.match(/(?:_{4,}|[-]{4,}[^-]*[-]{4,})\s*[\r\n]+From:\s*(.+?)(?:\r?\n|$)/i);
+  if (afterSep) return afterSep[1].trim();
+  // Fall back to first From: line
+  const match = bodyPreview.match(/From:\s*(.+?)(?:\r?\n|$)/);
+  return match ? match[1].trim() : null;
+}
+
+function cleanSubject(subject) {
+  if (!subject) return subject;
+  // Strip repeated FW:/Fwd:/Re: prefixes
+  return subject.replace(/^((fw|fwd|re):\s*)+/gi, '').trim();
+}
+
 const CLASS_COLORS = {
   action: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Action' },
   fyi: { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'FYI' },
@@ -117,8 +133,8 @@ export default function Emails() {
                     {email.received_at && new Date(email.received_at).toLocaleDateString()}
                   </span>
                 </div>
-                <div className="text-sm text-white truncate">{email.subject}</div>
-                <div className="text-xs text-gray-400 truncate mt-0.5">{email.sender}</div>
+                <div className="text-sm text-white truncate">{cleanSubject(email.subject)}</div>
+                <div className="text-xs text-gray-400 truncate mt-0.5">{parseOriginalSender(email.body_preview) || email.sender}</div>
 
                 {/* Inline correction */}
                 <div className="mt-2 flex items-center gap-2">
@@ -150,11 +166,8 @@ export default function Emails() {
             >
               &times;
             </button>
-            <h2 className="text-lg text-white font-medium mb-2 pr-6">{selected.subject}</h2>
-            <div className="text-sm text-gray-400 mb-0.5">From: {selected.sender}</div>
-            {selected.sender_email && (
-              <div className="text-xs text-gray-500 mb-1">{selected.sender_email}</div>
-            )}
+            <h2 className="text-lg text-white font-medium mb-2 pr-6">{cleanSubject(selected.subject)}</h2>
+            <div className="text-sm text-gray-400 mb-1">From: {parseOriginalSender(selected.body_preview) || selected.sender}</div>
             <div className="text-xs text-gray-500 mb-4">
               {selected.received_at && new Date(selected.received_at).toLocaleString()}
             </div>
