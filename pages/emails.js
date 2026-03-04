@@ -78,9 +78,15 @@ export default function Emails() {
   const getSender = (email) => email.original_sender || email.sender;
   const getSenderEmail = (email) => email.original_sender_email || email.sender_email;
   const getAttachments = (email) => {
-    if (!email.attachments) return [];
-    if (Array.isArray(email.attachments)) return email.attachments;
-    try { return JSON.parse(email.attachments); } catch { return []; }
+    let list = [];
+    if (!email.attachments) return list;
+    if (Array.isArray(email.attachments)) list = email.attachments;
+    else { try { list = JSON.parse(email.attachments); } catch { return []; } }
+    // Filter out inline/footer images (signature logos, Outlook image placeholders)
+    return list.filter(att => {
+      if (att.mimeType?.startsWith('image/') && /^image\d*\.(png|jpe?g|gif|bmp)$/i.test(att.filename)) return false;
+      return true;
+    });
   };
   const getBriefing = (email) => {
     if (!email.thread_briefing) return [];
@@ -162,7 +168,7 @@ export default function Emails() {
 
                 {/* AI Summary */}
                 {email.ai_summary && (
-                  <p className="text-sm text-gray-300 leading-relaxed mb-2 line-clamp-2">
+                  <p className="text-sm text-gray-300 leading-relaxed mb-2">
                     {email.ai_summary}
                   </p>
                 )}
