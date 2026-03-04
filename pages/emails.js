@@ -1,20 +1,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-function parseOriginalSender(bodyPreview) {
-  if (!bodyPreview) return null;
-  // Look for From: after Outlook separator (________) or "Original Message" / "Forwarded message"
-  const afterSep = bodyPreview.match(/(?:_{4,}|[-]{4,}[^-]*[-]{4,})\s*[\r\n]+From:\s*(.+?)(?:\r?\n|$)/i);
-  if (afterSep) return afterSep[1].trim();
-  // Fall back to first From: line
-  const match = bodyPreview.match(/From:\s*(.+?)(?:\r?\n|$)/);
-  return match ? match[1].trim() : null;
-}
-
 function cleanSubject(subject) {
   if (!subject) return subject;
-  // Strip repeated FW:/Fwd:/Re: prefixes
   return subject.replace(/^((fw|fwd|re):\s*)+/gi, '').trim();
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 const CLASS_COLORS = {
@@ -69,16 +65,28 @@ export default function Emails() {
     if (filter !== 'all' && effectiveClass(e) !== filter) return false;
     if (search) {
       const q = search.toLowerCase();
-      return (e.subject?.toLowerCase().includes(q) || e.sender?.toLowerCase().includes(q));
+      return (e.subject?.toLowerCase().includes(q) || e.sender?.toLowerCase().includes(q) || e.original_sender?.toLowerCase().includes(q));
     }
     return true;
   });
 
-  // Sort: action first, then fyi, then spam
   const classOrder = { action: 0, fyi: 1, spam: 2 };
   const sorted = filter === 'all'
     ? [...filtered].sort((a, b) => (classOrder[effectiveClass(a)] ?? 1) - (classOrder[effectiveClass(b)] ?? 1))
     : filtered;
+
+  const getSender = (email) => email.original_sender || email.sender;
+  const getSenderEmail = (email) => email.original_sender_email || email.sender_email;
+  const getAttachments = (email) => {
+    if (!email.attachments) return [];
+    if (Array.isArray(email.attachments)) return email.attachments;
+    try { return JSON.parse(email.attachments); } catch { return []; }
+  };
+  const getBriefing = (email) => {
+    if (!email.thread_briefing) return [];
+    if (Array.isArray(email.thread_briefing)) return email.thread_briefing;
+    try { return JSON.parse(email.thread_briefing); } catch { return []; }
+  };
 
   return (
     <div>
@@ -108,7 +116,7 @@ export default function Emails() {
 
       <div className="flex gap-4">
         {/* Email list */}
-        <div className="flex-1 space-y-1 min-w-0">
+        <div className="flex-1 space-y-2 min-w-0">
           {sorted.length === 0 && (
             <div className="text-center text-gray-500 py-16">No emails found.</div>
           )}
@@ -116,28 +124,85 @@ export default function Emails() {
             const cls = effectiveClass(email);
             const colors = CLASS_COLORS[cls] || CLASS_COLORS.action;
             const isSelected = selected?.id === email.id;
+            const attachments = getAttachments(email);
+            const briefing = getBriefing(email);
+            const visibleBriefing = briefing.slice(-3);
+            const hiddenCount = briefing.length - 3;
+            const receivedDate = email.received_at ? new Date(email.received_at) : null;
+
             return (
               <div
                 key={email.id}
                 onClick={() => setSelected(email)}
-                className={`bg-dark-800 border rounded-lg p-3 cursor-pointer transition-colors ${
+                className={`bg-dark-800 border rounded-lg p-4 cursor-pointer transition-colors ${
                   isSelected ? 'border-teal-500/50' : 'border-white/10 hover:border-white/20'
                 } ${!email.is_read ? 'border-l-2 border-l-teal-400' : ''}`}
               >
+                {/* Row 1: Badge + Subject + Date */}
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${colors.bg} ${colors.text}`}>
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium shrink-0 ${colors.bg} ${colors.text}`}>
                     {colors.label}
                   </span>
                   {email.is_starred && <span className="text-yellow-400 text-xs">★</span>}
-                  <span className="text-xs text-gray-500 ml-auto shrink-0">
-                    {email.received_at && new Date(email.received_at).toLocaleDateString()}
+                  <span className="text-sm text-white font-medium truncate flex-1">{cleanSubject(email.subject)}</span>
+                  <span className="text-xs text-gray-500 shrink-0">
+                    {receivedDate && receivedDate.toLocaleDateString()}
                   </span>
                 </div>
-                <div className="text-sm text-white truncate">{cleanSubject(email.subject)}</div>
-                <div className="text-xs text-gray-400 truncate mt-0.5">{parseOriginalSender(email.body_preview) || email.sender}</div>
 
-                {/* Inline correction */}
-                <div className="mt-2 flex items-center gap-2">
+                {/* Row 2: From + Time */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-gray-400 truncate">
+                    From: {getSender(email)} {getSenderEmail(email) && <span className="text-gray-600">&lt;{getSenderEmail(email)}&gt;</span>}
+                  </span>
+                  <span className="text-xs text-gray-500 shrink-0 ml-auto">
+                    {receivedDate && receivedDate.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+
+                {/* AI Summary */}
+                {email.ai_summary && (
+                  <p className="text-sm text-gray-300 leading-relaxed mb-2 line-clamp-2">
+                    {email.ai_summary}
+                  </p>
+                )}
+
+                {/* Thread Briefing */}
+                {briefing.length > 0 && (
+                  <div className="mb-2 text-xs space-y-0.5">
+                    {hiddenCount > 0 && (
+                      <div className="text-gray-600 italic">+{hiddenCount} earlier message{hiddenCount > 1 ? 's' : ''}</div>
+                    )}
+                    {visibleBriefing.map((b, i) => (
+                      <div key={i} className={`flex gap-1.5 ${b.is_last ? 'text-teal-400' : 'text-gray-500'}`}>
+                        <span className="shrink-0">•</span>
+                        <span><span className="font-medium">{b.sender}</span> {b.action}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Attachments */}
+                {attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {attachments.map((att, i) => (
+                      <a
+                        key={i}
+                        href={`/api/emails/attachment?gmail_id=${email.gmail_id}&attachment_id=${encodeURIComponent(att.attachmentId)}&filename=${encodeURIComponent(att.filename)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-dark-700 border border-white/10 rounded text-xs text-gray-400 hover:text-teal-400 hover:border-teal-500/30 transition-colors"
+                        title={att.filename}
+                      >
+                        <span>📎</span>
+                        <span className="truncate max-w-[120px]">{att.filename}</span>
+                        {att.size > 0 && <span className="text-gray-600">({formatFileSize(att.size)})</span>}
+                      </a>
+                    ))}
+                  </div>
+                )}
+
+                {/* Correction dropdown */}
+                <div className="flex items-center gap-2">
                   <select
                     value={cls}
                     onChange={(e) => { e.stopPropagation(); correctClassification(email.id, e.target.value); }}
@@ -167,10 +232,56 @@ export default function Emails() {
               &times;
             </button>
             <h2 className="text-lg text-white font-medium mb-2 pr-6">{cleanSubject(selected.subject)}</h2>
-            <div className="text-sm text-gray-400 mb-1">From: {parseOriginalSender(selected.body_preview) || selected.sender}</div>
-            <div className="text-xs text-gray-500 mb-4">
-              {selected.received_at && new Date(selected.received_at).toLocaleString()}
+            <div className="text-sm text-gray-400 mb-1">
+              From: {getSender(selected)} {getSenderEmail(selected) && <span className="text-gray-600">&lt;{getSenderEmail(selected)}&gt;</span>}
             </div>
+            <div className="text-xs text-gray-500 mb-3">
+              {selected.received_at && new Date(selected.received_at).toLocaleString('en-US', { hour12: false })}
+            </div>
+
+            {/* AI Summary in preview */}
+            {selected.ai_summary && (
+              <div className="bg-dark-700 border border-white/10 rounded-md p-3 mb-3">
+                <div className="text-xs text-teal-400 font-medium mb-1">AI Summary</div>
+                <p className="text-sm text-gray-300 leading-relaxed">{selected.ai_summary}</p>
+              </div>
+            )}
+
+            {/* Full thread briefing in preview */}
+            {getBriefing(selected).length > 0 && (
+              <div className="bg-dark-700 border border-white/10 rounded-md p-3 mb-3">
+                <div className="text-xs text-teal-400 font-medium mb-1">Thread</div>
+                <div className="space-y-1">
+                  {getBriefing(selected).map((b, i) => (
+                    <div key={i} className={`flex gap-1.5 text-xs ${b.is_last ? 'text-teal-400' : 'text-gray-500'}`}>
+                      <span className="shrink-0">•</span>
+                      <span><span className="font-medium">{b.sender}</span> {b.action} {b.is_last && <span className="text-teal-500 text-[10px]">[LATEST]</span>}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Attachments in preview */}
+            {getAttachments(selected).length > 0 && (
+              <div className="mb-3">
+                <div className="text-xs text-gray-500 mb-1">Attachments</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {getAttachments(selected).map((att, i) => (
+                    <a
+                      key={i}
+                      href={`/api/emails/attachment?gmail_id=${selected.gmail_id}&attachment_id=${encodeURIComponent(att.attachmentId)}&filename=${encodeURIComponent(att.filename)}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-dark-700 border border-white/10 rounded text-xs text-gray-400 hover:text-teal-400 hover:border-teal-500/30 transition-colors"
+                    >
+                      <span>📎</span>
+                      <span>{att.filename}</span>
+                      {att.size > 0 && <span className="text-gray-600">({formatFileSize(att.size)})</span>}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
               {selected.body_preview || selected.snippet || 'No preview available.'}
             </div>
