@@ -16,8 +16,9 @@ You can execute these actions when Kyle asks:
 - UPDATE_TASK: {"task_title_search": "...", "updates": {"status": "...", "priority": "...", "due_date": "..."}}
 - UPDATE_ACCOUNT: {"account_name": "...", "updates": {"last_contact": "now", "next_action": "...", "health": "...", "notes": "..."}}
 - SEND_BRIDGE: {"to_agent": "reggie", "message": "...", "category": "general|reminder|task|wedding|urgent"}
-- CREATE_BRIEFING: {"title": "...", "content_json": {"meetings": [], "tasks": [], "accounts": [], "bridge": [], "flags": []}, "content_text": "optional plain text fallback"}
-  Each section array contains objects with relevant fields: {title, time, description} for meetings, {title, description, status} for tasks, {name, status, description} for accounts, {message} for bridge, {subject, sender, description} for flags. Omit empty sections.
+- CREATE_BRIEFING: Writes to the "briefings" table (type='daily'). You have FULL access — just use the action. Schema:
+  {"title": "Morning Briefing — Mar 4", "content_json": {"meetings": [{"title": "...", "time": "...", "description": "..."}], "tasks": [{"title": "...", "description": "...", "status": "..."}], "accounts": [{"name": "...", "status": "...", "description": "..."}], "bridge": [{"message": "..."}], "flags": [{"subject": "...", "sender": "...", "description": "..."}]}, "content_text": "optional plain text summary"}
+  Build the briefing from the OPEN TASKS, ACCOUNTS, RECENT EMAILS, and BRIDGE MESSAGES data provided below. Only include sections that have content. Don't ask for the schema — you already have it. Just create the briefing.
 
 When you detect an action intent, include it in your response as a JSON block after your reply text, wrapped in <action> tags:
 
