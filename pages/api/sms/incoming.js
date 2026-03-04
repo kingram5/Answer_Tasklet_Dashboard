@@ -151,13 +151,15 @@ export default async function handler(req, res) {
     const systemPrompt = SMS_BASE_PROMPT + dashboardContext;
 
     // 3. Choose model based on message complexity
-    const isSimple = message.trim().length < 50 || /^(yes|no|ok|done|thanks|got it|mark|log|add task)/i.test(message.trim());
+    // Briefings, updates, summaries, and multi-account queries need Sonnet
+    const needsSonnet = /briefing|brief|summary|report|update.*account|all.*task|how.*doing|status/i.test(message.trim());
+    const isSimple = !needsSonnet && (message.trim().length < 50 || /^(yes|no|ok|done|thanks|got it|mark|log|add task)/i.test(message.trim()));
     const model = isSimple ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-5-20250929';
 
     // 4. Call Anthropic
     const aiResponse = await anthropic.messages.create({
       model,
-      max_tokens: 1024,
+      max_tokens: 4096,
       system: systemPrompt,
       messages: conversationHistory,
     });
