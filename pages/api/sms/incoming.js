@@ -16,6 +16,8 @@ You can execute these actions when Kyle asks:
 - UPDATE_TASK: {"task_title_search": "...", "updates": {"status": "...", "priority": "...", "due_date": "..."}}
 - UPDATE_ACCOUNT: {"account_name": "...", "updates": {"last_contact": "now", "next_action": "...", "health": "...", "notes": "..."}}
 - SEND_BRIDGE: {"to_agent": "reggie", "message": "...", "category": "general|reminder|task|wedding|urgent"}
+- CREATE_BRIEFING: {"title": "...", "content_json": {"meetings": [], "tasks": [], "accounts": [], "bridge": [], "flags": []}, "content_text": "optional plain text fallback"}
+  Each section array contains objects with relevant fields: {title, time, description} for meetings, {title, description, status} for tasks, {name, status, description} for accounts, {message} for bridge, {subject, sender, description} for flags. Omit empty sections.
 
 When you detect an action intent, include it in your response as a JSON block after your reply text, wrapped in <action> tags:
 
@@ -257,6 +259,19 @@ async function executeAction(action) {
         to_agent: to_agent || 'reggie',
         message,
         category: category || 'general',
+      });
+      if (error) throw error;
+      break;
+    }
+
+    case 'CREATE_BRIEFING': {
+      const { title, content_json, content_text } = action.data;
+
+      const { error } = await supabaseAdmin.from('briefings').insert({
+        type: 'daily',
+        title: title || 'Daily Briefing',
+        content_json: content_json || {},
+        content_text: content_text || '',
       });
       if (error) throw error;
       break;
