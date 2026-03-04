@@ -102,13 +102,15 @@ export default async function handler(req, res) {
       finalReply += `\n(Couldn't save: ${actionErrors.join(', ')} — I'll retry next message)`;
     }
 
-    // 7. Store conversation in chat_history
+    // 7. Store conversation in chat_history (explicit timestamps to guarantee ordering)
+    const now = new Date();
     await supabaseAdmin.from('chat_history').insert([
       {
         session_id: 'sms',
         role: 'user',
         content: message.trim(),
         model_used: model,
+        created_at: new Date(now.getTime()).toISOString(),
       },
       {
         session_id: 'sms',
@@ -117,6 +119,7 @@ export default async function handler(req, res) {
         model_used: model,
         tokens_in: aiResponse.usage?.input_tokens || 0,
         tokens_out: aiResponse.usage?.output_tokens || 0,
+        created_at: new Date(now.getTime() + 1).toISOString(),
       },
     ]);
 

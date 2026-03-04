@@ -19,7 +19,8 @@ export function ChatProvider({ children }) {
   });
 
   useEffect(() => {
-    async function loadHistory() {
+    let channel;
+    async function loadHistoryAndSubscribe() {
       try {
         const { supabase } = await import('../lib/supabase');
         const { data } = await supabase
@@ -30,11 +31,35 @@ export function ChatProvider({ children }) {
         if (data && data.length > 0) {
           setMessages(data.reverse().map(m => ({ role: m.role, content: m.content })));
         }
+
+        // Subscribe to new chat_history inserts (for SMS messages arriving in realtime)
+        channel = supabase
+          .channel('chat-realtime')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_history' }, (payload) => {
+            const newMsg = { role: payload.new.role, content: payload.new.content };
+            // Dedup: skip if the last message in state already matches (dashboard sends optimistically)
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last && last.role === newMsg.role && last.content === newMsg.content) {
+                return prev;
+              }
+              return [...prev, newMsg];
+            });
+          })
+          .subscribe();
       } catch (err) {
         console.error('Failed to load chat history:', err);
       }
     }
-    loadHistory();
+    loadHistoryAndSubscribe();
+
+    return () => {
+      if (channel) {
+        import('../lib/supabase').then(({ supabase }) => {
+          supabase.removeChannel(channel);
+        });
+      }
+    };
   }, []);
 
   const sendMessage = useCallback(async (content) => {
