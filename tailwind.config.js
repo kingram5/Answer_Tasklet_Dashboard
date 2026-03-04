@@ -3,6 +3,7 @@ module.exports = {
   content: [
     './pages/**/*.{js,jsx}',
     './components/**/*.{js,jsx}',
+    './contexts/**/*.{js,jsx}',
   ],
   theme: {
     extend: {
@@ -18,6 +19,12 @@ module.exports = {
           green: '#10b981',
           amber: '#f59e0b',
           red: '#ef4444',
+        },
+        teal: {
+          300: '#5eead4',
+          400: '#2dd4bf',
+          500: '#14b8a6',
+          600: '#0d9488',
         },
       },
     },

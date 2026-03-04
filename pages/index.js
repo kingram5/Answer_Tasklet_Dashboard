@@ -1,332 +1,253 @@
-import { useState, useRef, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+const STATUS_ORDER = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
+const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
 
-export default function Home() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [activeTab, setActiveTab] = useState('chat');
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+const PRIORITY_COLORS = {
+  urgent: 'bg-red-500/20 text-red-400',
+  high: 'bg-orange-500/20 text-orange-400',
+  medium: 'bg-yellow-500/20 text-yellow-400',
+  low: 'bg-gray-500/20 text-gray-400',
+};
+
+const STATUS_COLORS = {
+  todo: 'bg-gray-500/20 text-gray-400',
+  in_progress: 'bg-blue-500/20 text-blue-400',
+  done: 'bg-green-500/20 text-green-400',
+  blocked: 'bg-red-500/20 text-red-400',
+  cancelled: 'bg-gray-600/20 text-gray-500',
+};
+
+const SOURCE_ICONS = {
+  manual: '✏️', email: '📧', bridge: '🔄', cowork: '🤝', vapi: '📞', briefing: '📝',
+};
+
+export default function Tasks() {
+  const [tasks, setTasks] = useState([]);
+  const [filter, setFilter] = useState({ status: 'all', priority: 'all' });
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Load recent messages on mount
-  useEffect(() => {
-    if (!supabase) return;
-    const loadMessages = async () => {
+    async function load() {
       const { data } = await supabase
-        .from('chat_messages')
+        .from('tasks')
         .select('*')
-        .order('created_at', { ascending: true })
-        .limit(50);
-      if (data) {
-        setMessages(data.map(m => ({
-          role: m.role,
-          content: m.content,
-          timestamp: new Date(m.created_at),
-        })));
-      }
-    };
-    loadMessages();
-  }, []);
+        .order('created_at', { ascending: false });
+      if (data) setTasks(data);
+    }
+    load();
 
-  // Subscribe to Supabase realtime for Answer's responses
-  useEffect(() => {
-    if (!supabase) return;
     const channel = supabase
-      .channel('chat-responses')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages',
-        filter: 'role=eq.assistant',
-      }, (payload) => {
-        setMessages((prev) => [...prev, {
-          role: 'assistant',
-          content: payload.new.content,
-          timestamp: new Date(payload.new.created_at),
-        }]);
-        setSending(false);
+      .channel('tasks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setTasks(prev => [payload.new, ...prev.filter(t => t.id !== payload.new.id)]);
+        } else if (payload.eventType === 'UPDATE') {
+          setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
+        } else if (payload.eventType === 'DELETE') {
+          setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+        }
       })
       .subscribe();
+
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const sendMessage = async () => {
-    if (!input.trim() || sending) return;
-    const userMsg = { role: 'user', content: input.trim(), timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setSending(true);
-    inputRef.current?.focus();
+  const cycleStatus = useCallback(async (task) => {
+    const idx = STATUS_ORDER.indexOf(task.status);
+    const next = STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: task.id,
+        status: next,
+        completed_at: next === 'done' ? new Date().toISOString() : null,
+      }),
+    });
+  }, []);
 
-    try {
-      await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg.content }),
-      });
-    } catch (err) {
-      setMessages((prev) => [...prev, {
-        role: 'assistant',
-        content: 'Connection error. Try again in a moment.',
-        timestamp: new Date(),
-      }]);
-      setSending(false);
-    }
-  };
+  const cyclePriority = useCallback(async (task) => {
+    const idx = PRIORITY_ORDER.indexOf(task.priority);
+    const next = PRIORITY_ORDER[(idx + 1) % PRIORITY_ORDER.length];
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: task.id, priority: next }),
+    });
+  }, []);
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  const saveTitle = useCallback(async (id) => {
+    if (!editValue.trim()) { setEditingId(null); return; }
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, title: editValue.trim() }),
+    });
+    setEditingId(null);
+  }, [editValue]);
 
-  const quickActions = [
-    { icon: '📧', label: 'Run email triage', action: 'Run email triage now' },
-    { icon: '📊', label: 'Daily review', action: 'Generate daily review' },
-    { icon: '📋', label: 'Check tasks', action: 'Show my open tasks' },
-    { icon: '🔍', label: 'Account status', action: 'Show target account status' },
-    { icon: '📦', label: 'Supply check', action: 'Check supply status' },
-    { icon: '📞', label: 'Outreach due', action: 'Who needs outreach this week?' },
-  ];
+  const addTask = useCallback(async () => {
+    if (!newTitle.trim()) return;
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim(), priority: 'medium', status: 'todo', source: 'manual' }),
+    });
+    setNewTitle('');
+    setAdding(false);
+  }, [newTitle]);
+
+  const deleteTask = useCallback(async (id) => {
+    await fetch('/api/tasks', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  }, []);
+
+  const filtered = tasks.filter(t => {
+    if (filter.status !== 'all' && t.status !== filter.status) return false;
+    if (filter.priority !== 'all' && t.priority !== filter.priority) return false;
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-dark-900 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-dark-600 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-accent-blue flex items-center justify-center text-white font-bold text-base">
-              A
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">Answer</h1>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Control Dashboard</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Tab Navigation */}
-            <nav className="flex gap-1 bg-dark-800 rounded-lg p-1">
-              {[
-                { id: 'chat', label: '💬 Chat' },
-                { id: 'overview', label: '📊 Overview' },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-dark-600 text-white'
-                      : 'text-gray-400 hover:text-gray-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse"></span>
-              <span className="text-xs text-gray-400">Online</span>
-            </div>
-          </div>
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-white">Tasks</h1>
+        <button
+          onClick={() => setAdding(true)}
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm text-white font-medium transition-colors"
+        >
+          + Add Task
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <select
+          value={filter.status}
+          onChange={(e) => setFilter(f => ({ ...f, status: e.target.value }))}
+          className="bg-dark-700 border border-white/10 rounded-md px-2.5 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-teal-500/50"
+        >
+          <option value="all">All Status</option>
+          {STATUS_ORDER.map(s => (
+            <option key={s} value={s}>{s.replace('_', ' ')}</option>
+          ))}
+        </select>
+        <select
+          value={filter.priority}
+          onChange={(e) => setFilter(f => ({ ...f, priority: e.target.value }))}
+          className="bg-dark-700 border border-white/10 rounded-md px-2.5 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-teal-500/50"
+        >
+          <option value="all">All Priority</option>
+          {PRIORITY_ORDER.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Add task form */}
+      {adding && (
+        <div className="bg-dark-700 border border-teal-500/30 rounded-lg p-3 mb-4 flex gap-2">
+          <input
+            autoFocus
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') setAdding(false); }}
+            placeholder="Task title..."
+            className="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder-gray-500"
+          />
+          <button onClick={addTask} className="text-teal-400 text-sm hover:text-teal-300 font-medium">Save</button>
+          <button onClick={() => setAdding(false)} className="text-gray-500 text-sm hover:text-gray-400">Cancel</button>
         </div>
-      </header>
-
-      {activeTab === 'chat' ? (
-        <>
-          {/* Chat Area */}
-          <main className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
-            <div className="max-w-4xl mx-auto space-y-4">
-              {messages.length === 0 && (
-                <div className="text-center py-16">
-                  <div className="text-5xl mb-4">⚡</div>
-                  <h2 className="text-xl font-bold text-white mb-2">Answer Control Dashboard</h2>
-                  <p className="text-gray-400 text-sm mb-8">Your AI work automation command center</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-lg mx-auto">
-                    {quickActions.map((qa) => (
-                      <button
-                        key={qa.label}
-                        onClick={() => { setInput(qa.action); inputRef.current?.focus(); }}
-                        className="px-3 py-2.5 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs text-gray-300 transition-colors text-left"
-                      >
-                        <span className="mr-1">{qa.icon}</span> {qa.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                    msg.role === 'user'
-                      ? 'bg-accent-blue text-white rounded-br-md'
-                      : 'bg-dark-700 text-gray-200 rounded-bl-md'
-                  }`}>
-                    <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
-                    <p className="text-[10px] mt-1 opacity-50">
-                      {msg.timestamp?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {sending && (
-                <div className="flex justify-start">
-                  <div className="bg-dark-700 px-4 py-3 rounded-2xl rounded-bl-md">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></span>
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </main>
-
-          {/* Input */}
-          <footer className="border-t border-dark-600 px-4 py-3">
-            <div className="max-w-4xl mx-auto flex gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Message Answer..."
-                className="flex-1 bg-dark-700 text-white placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-accent-blue/50 transition-all"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!input.trim() || sending}
-                className="bg-accent-blue hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-accent-blue text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
-              >
-                Send
-              </button>
-            </div>
-          </footer>
-        </>
-      ) : (
-        /* Overview Tab */
-        <main className="flex-1 overflow-y-auto scrollbar-thin px-4 py-6">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Email Triage Widget */}
-              <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">📧 Email Triage</h3>
-                  <span className="text-[10px] text-gray-500 uppercase">Today</span>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-400">Action Items</span>
-                    <span className="text-xs font-bold text-accent-green">--</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-400">FYI</span>
-                    <span className="text-xs font-bold text-accent-blue">--</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-400">Spam</span>
-                    <span className="text-xs font-bold text-gray-500">--</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setActiveTab('chat'); setInput('Run email triage now'); }}
-                  className="mt-3 w-full py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs text-gray-300 transition-colors"
-                >
-                  Run Triage Now
-                </button>
-              </div>
-
-              {/* Tasks Widget */}
-              <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">📋 Tasks</h3>
-                  <span className="text-[10px] text-gray-500 uppercase">Open</span>
-                </div>
-                <p className="text-xs text-gray-400">Connect to view your tasks</p>
-                <button
-                  onClick={() => { setActiveTab('chat'); setInput('Show my open tasks'); }}
-                  className="mt-3 w-full py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs text-gray-300 transition-colors"
-                >
-                  View Tasks
-                </button>
-              </div>
-
-              {/* Revenue Widget */}
-              <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">💰 Revenue</h3>
-                  <span className="text-[10px] text-gray-500 uppercase">This Month</span>
-                </div>
-                <p className="text-2xl font-bold text-white">--</p>
-                <p className="text-xs text-gray-500 mt-1">Target: $2.5M</p>
-                <div className="mt-3 w-full h-2 bg-dark-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-accent-green rounded-full" style={{width: '0%'}}></div>
-                </div>
-              </div>
-
-              {/* Outreach Widget */}
-              <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">📞 Outreach</h3>
-                  <span className="text-[10px] text-gray-500 uppercase">Due</span>
-                </div>
-                <p className="text-xs text-gray-400">Accounts needing contact</p>
-                <button
-                  onClick={() => { setActiveTab('chat'); setInput('Who needs outreach this week?'); }}
-                  className="mt-3 w-full py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs text-gray-300 transition-colors"
-                >
-                  Check Outreach
-                </button>
-              </div>
-
-              {/* Supply Status Widget */}
-              <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">📦 Supply</h3>
-                  <span className="text-[10px] text-gray-500 uppercase">Alerts</span>
-                </div>
-                <p className="text-xs text-gray-400">No active supply alerts</p>
-                <button
-                  onClick={() => { setActiveTab('chat'); setInput('Check supply status'); }}
-                  className="mt-3 w-full py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs text-gray-300 transition-colors"
-                >
-                  Check Supply
-                </button>
-              </div>
-
-              {/* Quick Actions Widget */}
-              <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">⚡ Quick Actions</h3>
-                </div>
-                <div className="space-y-2">
-                  {quickActions.slice(0, 4).map(qa => (
-                    <button
-                      key={qa.label}
-                      onClick={() => { setActiveTab('chat'); setInput(qa.action); }}
-                      className="w-full text-left px-3 py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs text-gray-300 transition-colors"
-                    >
-                      {qa.icon} {qa.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
       )}
+
+      {/* Task list */}
+      <div className="space-y-1">
+        {filtered.length === 0 && (
+          <div className="text-center text-gray-500 py-16">
+            {tasks.length === 0
+              ? 'No tasks yet. Click "+ Add Task" to create one.'
+              : 'No tasks match your filters.'}
+          </div>
+        )}
+
+        {filtered.map(task => (
+          <div
+            key={task.id}
+            className="bg-dark-800 border border-white/10 rounded-lg p-3 flex items-center gap-3 group hover:border-white/20 transition-colors"
+          >
+            {/* Status */}
+            <button
+              onClick={() => cycleStatus(task)}
+              className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 transition-colors ${STATUS_COLORS[task.status] || STATUS_COLORS.todo}`}
+              title="Click to cycle status"
+            >
+              {(task.status || 'todo').replace('_', ' ')}
+            </button>
+
+            {/* Title */}
+            <div className="flex-1 min-w-0">
+              {editingId === task.id ? (
+                <input
+                  autoFocus
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveTitle(task.id);
+                    if (e.key === 'Escape') setEditingId(null);
+                  }}
+                  onBlur={() => saveTitle(task.id)}
+                  className="w-full bg-transparent text-white text-sm focus:outline-none border-b border-teal-500/50"
+                />
+              ) : (
+                <span
+                  onClick={() => { setEditingId(task.id); setEditValue(task.title || ''); }}
+                  className={`text-sm cursor-pointer block truncate ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-200 hover:text-white'}`}
+                >
+                  {task.title}
+                </span>
+              )}
+              {task.due_date && (
+                <span className={`text-xs ${new Date(task.due_date) < new Date() ? 'text-red-400' : 'text-gray-500'}`}>
+                  Due {new Date(task.due_date).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+
+            {/* Source */}
+            {task.source && (
+              <span className="text-xs shrink-0" title={task.source}>
+                {SOURCE_ICONS[task.source] || '📌'}
+              </span>
+            )}
+
+            {/* Priority */}
+            <button
+              onClick={() => cyclePriority(task)}
+              className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 transition-colors ${PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.medium}`}
+              title="Click to cycle priority"
+            >
+              {task.priority || 'medium'}
+            </button>
+
+            {/* Delete */}
+            <button
+              onClick={() => deleteTask(task.id)}
+              className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-lg leading-none"
+              title="Delete"
+            >
+              &times;
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
