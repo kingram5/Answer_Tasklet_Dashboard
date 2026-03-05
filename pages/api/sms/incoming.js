@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { validateTwilioRequest, sendSMS } from '../../../lib/twilio';
+import { validateTwilioRequest, sendSMS, escapeXml } from '../../../lib/twilio';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const KYLE_NUMBER = '+17144698951';
@@ -210,24 +210,19 @@ export default async function handler(req, res) {
       },
     ]);
 
-    // 9. Send SMS reply via Twilio
-    await sendSMS(KYLE_NUMBER, finalReply);
-
-    // Return TwiML empty response (we send reply via API, not TwiML)
+    // 9. Reply via TwiML (inline response — bypasses carrier A2P filtering)
+    // Once A2P 10DLC registration is approved, switch to sendSMS() for proactive outbound.
     res.setHeader('Content-Type', 'text/xml');
-    return res.status(200).send('<Response></Response>');
+    return res.status(200).send(
+      `<Response><Message>${escapeXml(finalReply)}</Message></Response>`
+    );
   } catch (err) {
     console.error('SMS pipeline error:', err);
 
-    // Try to notify Kyle of the failure
-    try {
-      await sendSMS(KYLE_NUMBER, "Hit a snag — try again in a minute.");
-    } catch (smsErr) {
-      console.error('Failed to send error SMS:', smsErr);
-    }
-
     res.setHeader('Content-Type', 'text/xml');
-    return res.status(200).send('<Response></Response>');
+    return res.status(200).send(
+      '<Response><Message>Hit a snag — try again in a minute.</Message></Response>'
+    );
   }
 }
 
