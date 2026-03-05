@@ -27,7 +27,7 @@ export default function ChatDrawer() {
     <div
       className={`
         fixed bottom-0 left-0 lg:left-60 right-0 z-30
-        bg-dark-800 border-t border-white/10
+        glass-dense
         transition-all duration-300 ease-in-out flex flex-col
         ${isExpanded ? 'h-[80vh] md:h-[40vh]' : 'h-12'}
       `}
@@ -35,7 +35,7 @@ export default function ChatDrawer() {
       {/* Toggle bar */}
       <button
         onClick={toggleDrawer}
-        className="w-full h-12 shrink-0 flex items-center px-4 gap-3 hover:bg-white/5 transition-colors relative"
+        className="w-full h-12 shrink-0 flex items-center px-4 gap-3 hover:bg-white/[0.04] transition-colors relative"
       >
         <div className="w-8 h-1 bg-gray-600 rounded-full absolute left-1/2 -translate-x-1/2 top-1.5" />
         <span className="text-teal-400 font-medium text-sm">Answer</span>
@@ -48,7 +48,7 @@ export default function ChatDrawer() {
           <span className="text-gray-600 text-xs">Ask Answer...</span>
         )}
         <svg
-          className={`w-4 h-4 text-gray-400 ml-auto transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-gray-400 ml-auto transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -92,19 +92,19 @@ export default function ChatDrawer() {
             <div ref={messagesEndRef} />
           </div>
 
-          <form onSubmit={handleSubmit} className="p-3 border-t border-white/10 flex gap-2 shrink-0">
+          <form onSubmit={handleSubmit} className="p-3 border-t border-white/[0.06] flex gap-2 shrink-0">
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask Answer anything..."
-              className="flex-1 bg-dark-700 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
+              className="flex-1 bg-dark-700 border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
             />
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:hover:bg-teal-600 rounded-lg text-sm text-white font-medium transition-colors"
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-500 hover:shadow-glow-teal-sm disabled:opacity-40 disabled:hover:bg-teal-600 rounded-lg text-sm text-white font-medium transition-all"
             >
               Send
             </button>

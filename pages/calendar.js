@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import PageHeader from '../components/ui/PageHeader';
+import { FilterPill } from '../components/ui/FilterBar';
 
 function getWeekDates(date) {
   const start = new Date(date);
@@ -15,12 +17,12 @@ function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7am to 8pm
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 
 export default function Calendar() {
   const [events, setEvents] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState('week'); // week or day
+  const [view, setView] = useState('week');
 
   useEffect(() => {
     async function load() {
@@ -56,35 +58,22 @@ export default function Calendar() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Calendar</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setView('day')}
-            className={`px-3 py-1 rounded text-sm ${view === 'day' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
-          >
-            Day
-          </button>
-          <button
-            onClick={() => setView('week')}
-            className={`px-3 py-1 rounded text-sm ${view === 'week' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
-          >
-            Week
-          </button>
-        </div>
-      </div>
+      <PageHeader title="Calendar">
+        <FilterPill active={view === 'day'} onClick={() => setView('day')}>Day</FilterPill>
+        <FilterPill active={view === 'week'} onClick={() => setView('week')}>Week</FilterPill>
+      </PageHeader>
 
       {/* Navigation */}
       <div className="flex items-center gap-4 mb-4">
         <button
           onClick={view === 'week' ? prevWeek : prevDay}
-          className="text-gray-400 hover:text-white text-lg"
+          className="text-gray-400 hover:text-white text-lg transition-colors"
         >
           ←
         </button>
         <button
           onClick={() => setCurrentDate(new Date())}
-          className="px-3 py-1 bg-dark-700 border border-white/10 rounded text-sm text-gray-300 hover:text-white"
+          className="px-3 py-1 bg-dark-700 border border-white/[0.06] rounded text-sm text-gray-300 hover:text-white hover:border-white/[0.12] transition-all"
         >
           Today
         </button>
@@ -96,7 +85,7 @@ export default function Calendar() {
         </span>
         <button
           onClick={view === 'week' ? nextWeek : nextDay}
-          className="text-gray-400 hover:text-white text-lg"
+          className="text-gray-400 hover:text-white text-lg transition-colors"
         >
           →
         </button>
@@ -110,8 +99,7 @@ export default function Calendar() {
 
       {events.length > 0 && view === 'week' && (
         <div className="hidden md:block overflow-x-auto">
-          {/* Week view header */}
-          <div className="grid grid-cols-8 border-b border-white/10">
+          <div className="grid grid-cols-8 border-b border-white/[0.06]">
             <div className="w-16"></div>
             {weekDates.map((d, i) => (
               <div
@@ -126,9 +114,8 @@ export default function Calendar() {
             ))}
           </div>
 
-          {/* Time grid */}
           {HOURS.map(hour => (
-            <div key={hour} className="grid grid-cols-8 border-b border-white/5 min-h-[3rem]">
+            <div key={hour} className="grid grid-cols-8 border-b border-white/[0.04] min-h-[3rem]">
               <div className="w-16 text-xs text-gray-500 py-1 px-2 text-right">
                 {hour > 12 ? `${hour - 12}pm` : hour === 12 ? '12pm' : `${hour}am`}
               </div>
@@ -138,11 +125,11 @@ export default function Calendar() {
                   return h === hour;
                 });
                 return (
-                  <div key={i} className="border-l border-white/5 px-1 py-0.5">
+                  <div key={i} className="border-l border-white/[0.04] px-1 py-0.5">
                     {dayEvents.map(ev => (
                       <div
                         key={ev.id}
-                        className="bg-teal-600/20 border-l-2 border-teal-400 rounded px-1.5 py-0.5 text-xs mb-0.5"
+                        className="bg-teal-600/20 border-l-2 border-teal-400 rounded px-1.5 py-0.5 text-xs mb-0.5 hover:bg-teal-600/30 transition-colors"
                         title={ev.description || ev.title}
                       >
                         <div className="text-teal-300 font-medium truncate">{ev.title}</div>
@@ -157,7 +144,7 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Day view (mobile + desktop day toggle) */}
+      {/* Day view */}
       {events.length > 0 && (view === 'day' || true) && (
         <div className={view === 'week' ? 'md:hidden' : ''}>
           <div className="space-y-1">
@@ -171,11 +158,11 @@ export default function Calendar() {
                   <div className="w-14 text-xs text-gray-500 py-1 text-right shrink-0">
                     {hour > 12 ? `${hour - 12}pm` : hour === 12 ? '12pm' : `${hour}am`}
                   </div>
-                  <div className="flex-1 border-t border-white/5 py-0.5">
+                  <div className="flex-1 border-t border-white/[0.04] py-0.5">
                     {dayEvents.map(ev => (
                       <div
                         key={ev.id}
-                        className="bg-teal-600/20 border-l-2 border-teal-400 rounded-r px-3 py-1.5 mb-1"
+                        className="bg-teal-600/20 border-l-2 border-teal-400 rounded-r px-3 py-1.5 mb-1 hover:bg-teal-600/30 transition-colors"
                       >
                         <div className="text-sm text-teal-300 font-medium">{ev.title}</div>
                         <div className="text-xs text-gray-400">

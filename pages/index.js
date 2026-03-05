@@ -1,22 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import SystemHealth from '../components/SystemHealth';
+import ActivityFeed from '../components/ActivityFeed';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import PageHeader from '../components/ui/PageHeader';
+import { FilterBar, FilterPill } from '../components/ui/FilterBar';
+import { SkeletonList } from '../components/ui/Skeleton';
 
 const STATUS_ORDER = ['todo', 'in_progress', 'blocked', 'done', 'cancelled'];
 const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
 
-const PRIORITY_COLORS = {
-  urgent: 'bg-red-500/20 text-red-400',
-  high: 'bg-orange-500/20 text-orange-400',
-  medium: 'bg-yellow-500/20 text-yellow-400',
-  low: 'bg-gray-500/20 text-gray-400',
+const PRIORITY_BADGE = {
+  urgent: 'red',
+  high: 'orange',
+  medium: 'yellow',
+  low: 'gray',
 };
 
-const STATUS_COLORS = {
-  todo: 'bg-gray-500/20 text-gray-400',
-  in_progress: 'bg-blue-500/20 text-blue-400',
-  done: 'bg-green-500/20 text-green-400',
-  blocked: 'bg-red-500/20 text-red-400',
-  cancelled: 'bg-gray-600/20 text-gray-500',
+const STATUS_BADGE = {
+  todo: 'gray',
+  in_progress: 'blue',
+  done: 'green',
+  blocked: 'red',
+  cancelled: 'gray',
 };
 
 const SOURCE_ICONS = {
@@ -25,6 +32,7 @@ const SOURCE_ICONS = {
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
+  const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState({ status: 'all', priority: 'all' });
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -38,6 +46,7 @@ export default function Tasks() {
         .select('*')
         .order('created_at', { ascending: false });
       if (data) setTasks(data);
+      setLoaded(true);
     }
     load();
 
@@ -118,136 +127,146 @@ export default function Tasks() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Tasks</h1>
+      {/* System Health Cards */}
+      <SystemHealth />
+
+      {/* Activity Feed */}
+      <ActivityFeed />
+
+      <PageHeader title="Tasks">
         <button
           onClick={() => setAdding(true)}
-          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm text-white font-medium transition-colors"
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 hover:shadow-glow-teal-sm rounded-lg text-sm text-white font-medium transition-all"
         >
           + Add Task
         </button>
-      </div>
+      </PageHeader>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <select
-          value={filter.status}
-          onChange={(e) => setFilter(f => ({ ...f, status: e.target.value }))}
-          className="bg-dark-700 border border-white/10 rounded-md px-2.5 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-teal-500/50"
-        >
-          <option value="all">All Status</option>
-          {STATUS_ORDER.map(s => (
-            <option key={s} value={s}>{s.replace('_', ' ')}</option>
-          ))}
-        </select>
-        <select
-          value={filter.priority}
-          onChange={(e) => setFilter(f => ({ ...f, priority: e.target.value }))}
-          className="bg-dark-700 border border-white/10 rounded-md px-2.5 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-teal-500/50"
-        >
-          <option value="all">All Priority</option>
-          {PRIORITY_ORDER.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-      </div>
+      <FilterBar>
+        <FilterPill active={filter.status === 'all'} onClick={() => setFilter(f => ({ ...f, status: 'all' }))}>
+          All Status
+        </FilterPill>
+        {STATUS_ORDER.map(s => (
+          <FilterPill key={s} active={filter.status === s} onClick={() => setFilter(f => ({ ...f, status: s }))}>
+            {s.replace('_', ' ')}
+          </FilterPill>
+        ))}
+        <div className="w-px h-6 bg-white/[0.06] mx-1" />
+        <FilterPill active={filter.priority === 'all'} onClick={() => setFilter(f => ({ ...f, priority: 'all' }))}>
+          All Priority
+        </FilterPill>
+        {PRIORITY_ORDER.map(p => (
+          <FilterPill key={p} active={filter.priority === p} onClick={() => setFilter(f => ({ ...f, priority: p }))}>
+            {p}
+          </FilterPill>
+        ))}
+      </FilterBar>
 
       {/* Add task form */}
       {adding && (
-        <div className="bg-dark-700 border border-teal-500/30 rounded-lg p-3 mb-4 flex gap-2">
-          <input
-            autoFocus
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') setAdding(false); }}
-            placeholder="Task title..."
-            className="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder-gray-500"
-          />
-          <button onClick={addTask} className="text-teal-400 text-sm hover:text-teal-300 font-medium">Save</button>
-          <button onClick={() => setAdding(false)} className="text-gray-500 text-sm hover:text-gray-400">Cancel</button>
-        </div>
+        <Card className="p-3 mb-4 border-teal-500/30">
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') setAdding(false); }}
+              placeholder="Task title..."
+              className="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder-gray-500"
+            />
+            <button onClick={addTask} className="text-teal-400 text-sm hover:text-teal-300 font-medium">Save</button>
+            <button onClick={() => setAdding(false)} className="text-gray-500 text-sm hover:text-gray-400">Cancel</button>
+          </div>
+        </Card>
       )}
 
       {/* Task list */}
-      <div className="space-y-1">
-        {filtered.length === 0 && (
-          <div className="text-center text-gray-500 py-16">
-            {tasks.length === 0
-              ? 'No tasks yet. Click "+ Add Task" to create one.'
-              : 'No tasks match your filters.'}
-          </div>
-        )}
-
-        {filtered.map(task => (
-          <div
-            key={task.id}
-            className="bg-dark-800 border border-white/10 rounded-lg p-3 flex items-center gap-3 group hover:border-white/20 transition-colors"
-          >
-            {/* Status */}
-            <button
-              onClick={() => cycleStatus(task)}
-              className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 transition-colors ${STATUS_COLORS[task.status] || STATUS_COLORS.todo}`}
-              title="Click to cycle status"
-            >
-              {(task.status || 'todo').replace('_', ' ')}
-            </button>
-
-            {/* Title */}
-            <div className="flex-1 min-w-0">
-              {editingId === task.id ? (
-                <input
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveTitle(task.id);
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                  onBlur={() => saveTitle(task.id)}
-                  className="w-full bg-transparent text-white text-sm focus:outline-none border-b border-teal-500/50"
-                />
-              ) : (
-                <span
-                  onClick={() => { setEditingId(task.id); setEditValue(task.title || ''); }}
-                  className={`text-sm cursor-pointer block truncate ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-200 hover:text-white'}`}
-                >
-                  {task.title}
-                </span>
-              )}
-              {task.due_date && (
-                <span className={`text-xs ${new Date(task.due_date) < new Date() ? 'text-red-400' : 'text-gray-500'}`}>
-                  Due {new Date(task.due_date).toLocaleDateString()}
-                </span>
-              )}
+      {!loaded ? (
+        <SkeletonList count={8} />
+      ) : (
+        <div className="space-y-1 card-stagger">
+          {filtered.length === 0 && (
+            <div className="text-center text-gray-500 py-16">
+              {tasks.length === 0
+                ? 'No tasks yet. Click "+ Add Task" to create one.'
+                : 'No tasks match your filters.'}
             </div>
+          )}
 
-            {/* Source */}
-            {task.source && (
-              <span className="text-xs shrink-0" title={task.source}>
-                {SOURCE_ICONS[task.source] || '📌'}
-              </span>
-            )}
-
-            {/* Priority */}
-            <button
-              onClick={() => cyclePriority(task)}
-              className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 transition-colors ${PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.medium}`}
-              title="Click to cycle priority"
+          {filtered.map(task => (
+            <Card
+              key={task.id}
+              className="p-3 flex items-center gap-3 group"
             >
-              {task.priority || 'medium'}
-            </button>
+              {/* Status */}
+              <button
+                onClick={() => cycleStatus(task)}
+                title="Click to cycle status"
+              >
+                <Badge variant={STATUS_BADGE[task.status] || 'gray'}>
+                  {(task.status || 'todo').replace('_', ' ')}
+                </Badge>
+              </button>
 
-            {/* Delete */}
-            <button
-              onClick={() => deleteTask(task.id)}
-              className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-lg leading-none"
-              title="Delete"
-            >
-              &times;
-            </button>
-          </div>
-        ))}
-      </div>
+              {/* Title */}
+              <div className="flex-1 min-w-0">
+                {editingId === task.id ? (
+                  <input
+                    autoFocus
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveTitle(task.id);
+                      if (e.key === 'Escape') setEditingId(null);
+                    }}
+                    onBlur={() => saveTitle(task.id)}
+                    className="w-full bg-transparent text-white text-sm focus:outline-none border-b border-teal-500/50"
+                  />
+                ) : (
+                  <span
+                    onClick={() => { setEditingId(task.id); setEditValue(task.title || ''); }}
+                    className={`text-sm cursor-pointer block truncate ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-200 hover:text-white'}`}
+                  >
+                    {task.title}
+                  </span>
+                )}
+                {task.due_date && (
+                  <span className={`text-xs ${new Date(task.due_date) < new Date() ? 'text-red-400' : 'text-gray-500'}`}>
+                    Due {new Date(task.due_date).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+
+              {/* Source */}
+              {task.source && (
+                <span className="text-xs shrink-0" title={task.source}>
+                  {SOURCE_ICONS[task.source] || '📌'}
+                </span>
+              )}
+
+              {/* Priority */}
+              <button
+                onClick={() => cyclePriority(task)}
+                title="Click to cycle priority"
+              >
+                <Badge variant={PRIORITY_BADGE[task.priority] || 'gray'}>
+                  {task.priority || 'medium'}
+                </Badge>
+              </button>
+
+              {/* Delete */}
+              <button
+                onClick={() => deleteTask(task.id)}
+                className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-lg leading-none"
+                title="Delete"
+              >
+                &times;
+              </button>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

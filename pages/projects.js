@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import PageHeader from '../components/ui/PageHeader';
 
-const STATUS_COLORS = {
-  active: 'bg-green-500/20 text-green-400',
-  paused: 'bg-yellow-500/20 text-yellow-400',
-  completed: 'bg-blue-500/20 text-blue-400',
-  archived: 'bg-gray-500/20 text-gray-500',
+const STATUS_BADGE = {
+  active: 'green', paused: 'yellow', completed: 'blue', archived: 'gray',
 };
 
 const NODE_COLORS = {
@@ -43,7 +43,6 @@ export default function Projects() {
     });
     setNewName('');
     setAdding(false);
-    // Reload
     const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
     if (data) setProjects(data);
   }
@@ -72,7 +71,6 @@ export default function Projects() {
       return <div className="text-gray-500 text-sm py-4 text-center">No nodes yet.</div>;
     }
 
-    // Build tree from flat list
     const rootNodes = nodes.filter(n => !n.parent_id);
     const childMap = {};
     nodes.forEach(n => {
@@ -102,29 +100,30 @@ export default function Projects() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Projects</h1>
+      <PageHeader title="Projects">
         <button
           onClick={() => setAdding(true)}
-          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm text-white font-medium transition-colors"
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 hover:shadow-glow-teal-sm rounded-lg text-sm text-white font-medium transition-all"
         >
           + New Project
         </button>
-      </div>
+      </PageHeader>
 
       {adding && (
-        <div className="bg-dark-700 border border-teal-500/30 rounded-lg p-3 mb-4 flex gap-2">
-          <input
-            autoFocus
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addProject(); if (e.key === 'Escape') setAdding(false); }}
-            placeholder="Project name..."
-            className="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder-gray-500"
-          />
-          <button onClick={addProject} className="text-teal-400 text-sm hover:text-teal-300 font-medium">Create</button>
-          <button onClick={() => setAdding(false)} className="text-gray-500 text-sm hover:text-gray-400">Cancel</button>
-        </div>
+        <Card className="p-3 mb-4 border-teal-500/30">
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addProject(); if (e.key === 'Escape') setAdding(false); }}
+              placeholder="Project name..."
+              className="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder-gray-500"
+            />
+            <button onClick={addProject} className="text-teal-400 text-sm hover:text-teal-300 font-medium">Create</button>
+            <button onClick={() => setAdding(false)} className="text-gray-500 text-sm hover:text-gray-400">Cancel</button>
+          </div>
+        </Card>
       )}
 
       {projects.length === 0 && !adding && (
@@ -133,15 +132,15 @@ export default function Projects() {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 card-stagger">
         {projects.map(project => (
-          <div key={project.id} className="bg-dark-800 border border-white/10 rounded-lg overflow-hidden">
+          <Card key={project.id} className="overflow-hidden">
             <div
               onClick={() => setExpanded(expanded === project.id ? null : project.id)}
-              className="p-4 flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors"
+              className="p-4 flex items-center gap-3 cursor-pointer hover:bg-white/[0.03] transition-colors"
             >
               <svg
-                className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${expanded === project.id ? 'rotate-90' : ''}`}
+                className={`w-4 h-4 text-gray-400 transition-transform duration-150 shrink-0 ${expanded === project.id ? 'rotate-90' : ''}`}
                 fill="none" viewBox="0 0 24 24" stroke="currentColor"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -152,25 +151,23 @@ export default function Projects() {
                   <div className="text-xs text-gray-400 truncate mt-0.5">{project.description}</div>
                 )}
               </div>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${STATUS_COLORS[project.status] || STATUS_COLORS.active}`}>
-                {project.status}
-              </span>
+              <Badge variant={STATUS_BADGE[project.status] || 'green'}>{project.status}</Badge>
               {project.tags && project.tags.length > 0 && (
                 <div className="hidden md:flex gap-1">
                   {project.tags.map((tag, i) => (
-                    <span key={i} className="px-1.5 py-0.5 bg-dark-600 rounded text-xs text-gray-400">{tag}</span>
+                    <Badge key={i} variant="gray">{tag}</Badge>
                   ))}
                 </div>
               )}
             </div>
 
             {expanded === project.id && (
-              <div className="border-t border-white/10 p-4">
+              <div className="border-t border-white/[0.06] p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <select
                     value={project.status}
                     onChange={(e) => updateProject(project.id, { status: e.target.value })}
-                    className="bg-dark-700 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none"
+                    className="bg-dark-700 border border-white/[0.06] rounded px-2 py-1 text-xs text-gray-300 focus:outline-none"
                   >
                     <option value="active">Active</option>
                     <option value="paused">Paused</option>
@@ -187,7 +184,7 @@ export default function Projects() {
                 {renderNodes(project.nodes_json)}
               </div>
             )}
-          </div>
+          </Card>
         ))}
       </div>
     </div>

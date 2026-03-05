@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import Badge from '../components/ui/Badge';
+import PageHeader from '../components/ui/PageHeader';
 
-const CATEGORY_COLORS = {
-  general: 'bg-gray-500/20 text-gray-400',
-  reminder: 'bg-blue-500/20 text-blue-400',
-  task: 'bg-green-500/20 text-green-400',
-  wedding: 'bg-pink-500/20 text-pink-400',
-  urgent: 'bg-red-500/20 text-red-400',
+const CATEGORY_BADGE = {
+  general: 'gray', reminder: 'blue', task: 'green', wedding: 'pink', urgent: 'red',
 };
 
 export default function Bridge() {
@@ -77,7 +75,7 @@ export default function Bridge() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)]">
-      <h1 className="text-2xl font-bold text-white mb-4 shrink-0">Bridge Messages</h1>
+      <PageHeader title="Bridge Messages" />
 
       {messages.length === 0 && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
@@ -95,7 +93,6 @@ export default function Bridge() {
               <div className="space-y-2">
                 {msgs.map(msg => {
                   const isAnswer = msg.from_agent === 'answer';
-                  const catColors = CATEGORY_COLORS[msg.category] || CATEGORY_COLORS.general;
                   return (
                     <div
                       key={msg.id}
@@ -106,9 +103,9 @@ export default function Bridge() {
                           <span className="text-xs text-gray-500">
                             {isAnswer ? 'Answer' : 'Reggie'}
                           </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${catColors}`}>
+                          <Badge variant={CATEGORY_BADGE[msg.category] || 'gray'} className="text-[10px]">
                             {msg.category}
-                          </span>
+                          </Badge>
                           <span className="text-[10px] text-gray-600">
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                           </span>
@@ -140,7 +137,7 @@ export default function Bridge() {
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="bg-dark-700 border border-white/10 rounded-lg px-2 py-2 text-xs text-gray-300 focus:outline-none shrink-0"
+          className="bg-dark-700 border border-white/[0.06] rounded-lg px-2 py-2 text-xs text-gray-300 focus:outline-none shrink-0"
         >
           <option value="general">General</option>
           <option value="reminder">Reminder</option>
@@ -153,12 +150,12 @@ export default function Bridge() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Message Reggie..."
-          className="flex-1 bg-dark-700 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
+          className="flex-1 bg-dark-700 border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
         />
         <button
           type="submit"
           disabled={sending || !input.trim()}
-          className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-lg text-sm text-white font-medium transition-colors"
+          className="px-4 py-2 bg-teal-600 hover:bg-teal-500 hover:shadow-glow-teal-sm disabled:opacity-40 rounded-lg text-sm text-white font-medium transition-all"
         >
           Send
         </button>
