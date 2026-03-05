@@ -64,11 +64,11 @@ export default function Sidebar({ isOpen, onClose }) {
         {/* Branding */}
         <div className="p-5 border-b border-white/[0.06]">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-glow-teal-sm">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cosmic-purple flex items-center justify-center shadow-glow-teal-sm">
               <span className="text-white text-xs font-bold">A</span>
             </div>
             <div>
-              <h1 className="text-sm font-semibold text-white tracking-wide">ANSWER</h1>
+              <h1 className="text-sm font-semibold text-gradient-cosmic tracking-wide">ANSWER</h1>
               <p className="text-[10px] text-gray-500 tracking-widest">DASHBOARD</p>
             </div>
           </div>
@@ -99,7 +99,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                       className="overflow-hidden"
                     >
                       <div className="space-y-0.5 mt-1">
@@ -115,7 +115,7 @@ export default function Sidebar({ isOpen, onClose }) {
                                 flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm
                                 transition-all duration-150
                                 ${isActive
-                                  ? 'bg-teal-500/10 text-teal-300 shadow-glow-teal-sm'
+                                  ? 'bg-teal-500/10 text-teal-300 shadow-glow-teal-sm shimmer-sweep'
                                   : 'text-gray-400 hover:bg-white/[0.04] hover:text-gray-200'
                                 }
                               `}

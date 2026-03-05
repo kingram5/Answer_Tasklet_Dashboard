@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { animate } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import GlassCard from './ui/GlassCard';
 
@@ -9,6 +10,24 @@ function timeAgo(dateStr) {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function AnimatedNumber({ value }) {
+  const num = parseInt(value, 10);
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (isNaN(num)) return;
+    const controls = animate(0, num, {
+      duration: 1.2,
+      ease: [0.34, 1.56, 0.64, 1],
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return () => controls.stop();
+  }, [num]);
+
+  if (isNaN(num)) return <span>{value}</span>;
+  return <span>{display}</span>;
 }
 
 const DOT_COLORS = {
@@ -25,14 +44,17 @@ const TEXT_COLORS = {
   gray: 'text-gray-500',
 };
 
-function HealthCard({ label, value, status }) {
+function HealthCard({ label, value, status, index }) {
+  const variant = index % 2 === 0 ? 'teal' : 'purple';
   return (
-    <GlassCard className="p-3">
+    <GlassCard animated variant={variant} className="p-3">
       <div className="flex items-center gap-2 mb-1">
-        <div className={`w-1.5 h-1.5 rounded-full ${DOT_COLORS[status]}`} />
+        <div className={`w-1.5 h-1.5 rounded-full ${DOT_COLORS[status]} animate-pulse-subtle`} />
         <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">{label}</span>
       </div>
-      <div className={`text-sm font-semibold ${TEXT_COLORS[status]}`}>{value}</div>
+      <div className={`text-lg font-bold ${TEXT_COLORS[status]}`}>
+        <AnimatedNumber value={value} />
+      </div>
     </GlassCard>
   );
 }
@@ -78,7 +100,7 @@ export default function SystemHealth() {
         {[1,2,3,4].map(i => (
           <div key={i} className="glass rounded-xl p-3">
             <div className="skeleton w-16 h-3 mb-2" />
-            <div className="skeleton w-12 h-4" />
+            <div className="skeleton w-12 h-5" />
           </div>
         ))}
       </div>
@@ -91,21 +113,25 @@ export default function SystemHealth() {
         label="API"
         value={health.api ? 'Online' : 'Offline'}
         status={health.api ? 'green' : 'red'}
+        index={0}
       />
       <HealthCard
         label="Database"
         value={health.supabase ? 'Connected' : 'Error'}
         status={health.supabase ? 'green' : 'red'}
+        index={1}
       />
       <HealthCard
         label="Last Sync"
         value={timeAgo(health.lastSync)}
         status={health.lastSync ? 'green' : 'amber'}
+        index={2}
       />
       <HealthCard
         label="Emails Today"
         value={health.emailsToday.toString()}
         status={health.emailsToday > 0 ? 'green' : 'gray'}
+        index={3}
       />
     </div>
   );

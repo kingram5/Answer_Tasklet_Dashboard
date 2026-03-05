@@ -3,9 +3,9 @@ export function FilterPill({ active, onClick, children, className = '' }) {
     <button
       onClick={onClick}
       className={`
-        px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-150
+        px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
         ${active
-          ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
+          ? 'bg-gradient-to-r from-teal-500/15 to-cosmic-purple/15 text-teal-300 border border-teal-500/30 shadow-glow-teal-sm shimmer-sweep'
           : 'text-gray-400 border border-white/[0.06] hover:border-white/[0.12] hover:text-gray-200'
         }
         ${className}

@@ -11,10 +11,10 @@ const VARIANTS = {
   yellow: 'bg-yellow-500/15 text-yellow-400',
 };
 
-export default function Badge({ variant = 'gray', children, className = '', ...props }) {
+export default function Badge({ variant = 'gray', shimmer = false, children, className = '', ...props }) {
   return (
     <span
-      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${VARIANTS[variant] || VARIANTS.gray} ${className}`}
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${VARIANTS[variant] || VARIANTS.gray} ${shimmer ? 'shimmer-sweep' : ''} ${className}`}
       {...props}
     >
       {children}

@@ -13,7 +13,7 @@ function timeAgo(dateStr) {
 const TYPE_CONFIG = {
   email_triage: { color: 'bg-blue-400', label: 'Email triaged' },
   task_created: { color: 'bg-green-400', label: 'Task created' },
-  bridge_msg: { color: 'bg-teal-400', label: 'Bridge message' },
+  bridge_msg: { color: 'bg-cosmic-purple', label: 'Bridge message' },
 };
 
 export default function ActivityFeed() {
@@ -75,8 +75,8 @@ export default function ActivityFeed() {
 
   return (
     <div className="mb-6">
-      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">Recent Activity</h2>
-      <div className="glass rounded-xl p-4">
+      <h2 className="text-sm font-medium text-gradient-teal-purple uppercase tracking-wider mb-3">Recent Activity</h2>
+      <div className="glass rounded-xl p-4 relative glass-noise">
         <div className="space-y-0">
           {activities.map((activity, i) => {
             const config = TYPE_CONFIG[activity.type] || TYPE_CONFIG.task_created;

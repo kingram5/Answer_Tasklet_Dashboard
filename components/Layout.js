@@ -18,7 +18,9 @@ export default function Layout({ children }) {
 
       <div className="min-h-screen bg-dark-900 text-gray-300">
         {/* Cosmic star background */}
-        <div className="stars-bg" />
+        <div className="stars-bg">
+          <span className="nebula-layer" />
+        </div>
 
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -33,10 +35,10 @@ export default function Layout({ children }) {
             </svg>
           </button>
           <div className="ml-3 flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-glow-teal-sm">
+            <div className="w-5 h-5 rounded bg-gradient-to-br from-teal-400 to-cosmic-purple flex items-center justify-center shadow-glow-teal-sm">
               <span className="text-white text-[8px] font-bold">A</span>
             </div>
-            <span className="text-sm font-semibold text-white tracking-wide">ANSWER</span>
+            <span className="text-sm font-semibold text-gradient-cosmic tracking-wide">ANSWER</span>
           </div>
         </header>
 

@@ -46,6 +46,8 @@ module.exports = {
         'glow-teal': '0 0 15px 0 rgba(20, 184, 166, 0.20)',
         'glow-teal-lg': '0 0 25px 0 rgba(20, 184, 166, 0.25)',
         'glow-purple-sm': '0 0 8px 0 rgba(99, 102, 241, 0.15)',
+        'glow-purple': '0 0 15px 0 rgba(99, 102, 241, 0.20)',
+        'glow-purple-lg': '0 0 25px 0 rgba(99, 102, 241, 0.25)',
         'glow-blue-sm': '0 0 8px 0 rgba(59, 130, 246, 0.15)',
         'glow-red-sm': '0 0 8px 0 rgba(239, 68, 68, 0.15)',
         'glow-green-sm': '0 0 8px 0 rgba(16, 185, 129, 0.15)',
@@ -60,7 +62,12 @@ module.exports = {
         'slide-in-left': 'slideInLeft 0.2s ease-out',
         'pulse-subtle': 'pulseSubtle 3s ease-in-out infinite',
         'shimmer': 'shimmer 1.5s ease-in-out infinite',
-        'star-drift': 'starDrift 60s linear infinite',
+        'star-drift': 'starDrift 40s linear infinite',
+        'border-rotate': 'borderRotate 4s linear infinite',
+        'shimmer-sweep': 'shimmerSweep 2s ease-in-out infinite',
+        'twinkle-1': 'twinkle 3s ease-in-out infinite',
+        'twinkle-2': 'twinkle 4s ease-in-out 1s infinite',
+        'twinkle-3': 'twinkle 5s ease-in-out 2s infinite',
       },
       keyframes: {
         fadeIn: {
@@ -86,6 +93,18 @@ module.exports = {
         starDrift: {
           '0%': { transform: 'translateY(0)' },
           '100%': { transform: 'translateY(-50%)' },
+        },
+        borderRotate: {
+          '0%': { '--border-angle': '0deg' },
+          '100%': { '--border-angle': '360deg' },
+        },
+        shimmerSweep: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+        twinkle: {
+          '0%, 100%': { opacity: '0.15' },
+          '50%': { opacity: '0.6' },
         },
       },
     },

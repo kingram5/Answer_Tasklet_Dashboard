@@ -38,7 +38,7 @@ export default function ChatDrawer() {
         className="w-full h-12 shrink-0 flex items-center px-4 gap-3 hover:bg-white/[0.04] transition-colors relative"
       >
         <div className="w-8 h-1 bg-gray-600 rounded-full absolute left-1/2 -translate-x-1/2 top-1.5" />
-        <span className="text-teal-400 font-medium text-sm">Answer</span>
+        <span className="text-gradient-teal-purple font-medium text-sm">Answer</span>
         {!isExpanded && lastMsg && (
           <span className="text-gray-500 text-xs truncate max-w-[50%]">
             {lastMsg.content?.slice(0, 80)}
@@ -104,7 +104,7 @@ export default function ChatDrawer() {
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-500 hover:shadow-glow-teal-sm disabled:opacity-40 disabled:hover:bg-teal-600 rounded-lg text-sm text-white font-medium transition-all"
+              className="px-4 py-2 bg-gradient-to-r from-teal-600 to-cosmic-purple hover:from-teal-500 hover:to-cosmic-violet hover:shadow-glow-teal disabled:opacity-40 rounded-lg text-sm text-white font-medium transition-all shimmer-sweep"
             >
               Send
             </button>

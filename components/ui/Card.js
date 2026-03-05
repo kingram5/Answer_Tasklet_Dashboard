@@ -9,9 +9,9 @@ export default function Card({ children, className = '', glow = 'teal', hover = 
   return (
     <div
       className={`
-        bg-dark-800 border border-white/[0.06] rounded-lg
-        transition-all duration-200
-        ${hover ? 'hover:border-white/[0.12]' : ''}
+        bg-dark-800 rounded-lg
+        transition-all duration-300
+        ${hover ? 'animated-border hover:scale-[1.01] hover:-translate-y-0.5' : 'border border-white/[0.06]'}
         ${glowClass}
         ${className}
       `}

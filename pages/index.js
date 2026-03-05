@@ -136,7 +136,7 @@ export default function Tasks() {
       <PageHeader title="Tasks">
         <button
           onClick={() => setAdding(true)}
-          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 hover:shadow-glow-teal-sm rounded-lg text-sm text-white font-medium transition-all"
+          className="px-3 py-1.5 bg-gradient-to-r from-teal-600 to-cosmic-purple hover:from-teal-500 hover:to-cosmic-violet hover:shadow-glow-teal rounded-lg text-sm text-white font-medium transition-all shimmer-sweep"
         >
           + Add Task
         </button>
